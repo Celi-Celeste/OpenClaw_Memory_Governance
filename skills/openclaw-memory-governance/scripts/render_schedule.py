@@ -12,8 +12,9 @@ def cron_lines(workspace: Path, scripts_dir: Path, agent_id: str) -> list[str]:
     logs = workspace / "memory" / "logs"
     lines = [
         f"0 * * * * /usr/bin/env python3 {scripts_dir / 'hourly_semantic_extract.py'} --workspace {workspace} >> {logs / 'hourly.log'} 2>&1",
-        f"10 3 * * * /usr/bin/env python3 {scripts_dir / 'daily_consolidate.py'} --workspace {workspace} --agent-id {agent_id} >> {logs / 'daily.log'} 2>&1",
-        f"20 4 * * 0 /usr/bin/env python3 {scripts_dir / 'weekly_drift_review.py'} --workspace {workspace} >> {logs / 'weekly.log'} 2>&1",
+        f"10 3 * * * /usr/bin/env python3 {scripts_dir / 'daily_consolidate.py'} --workspace {workspace} --agent-id {agent_id} --transcript-root archive/transcripts >> {logs / 'daily.log'} 2>&1",
+        f"10 4 * * 0 /usr/bin/env python3 {scripts_dir / 'weekly_identity_promote.py'} --workspace {workspace} --window-days 30 --min-importance 0.85 --min-recurrence 3 >> {logs / 'weekly-identity.log'} 2>&1",
+        f"20 4 * * 0 /usr/bin/env python3 {scripts_dir / 'weekly_drift_review.py'} --workspace {workspace} --window-days 7 >> {logs / 'weekly-drift.log'} 2>&1",
     ]
     return lines
 
@@ -82,7 +83,18 @@ def main() -> int:
             logs_dir,
             hour=3,
             minute=10,
-            extra_args=["--agent-id", args.agent_id],
+            extra_args=["--agent-id", args.agent_id, "--transcript-root", "archive/transcripts"],
+        )
+        write_launchd_plist(
+            out / "com.openclaw.memory.weekly-identity.plist",
+            "com.openclaw.memory.weekly-identity",
+            scripts_dir / "weekly_identity_promote.py",
+            workspace,
+            logs_dir,
+            hour=4,
+            minute=10,
+            weekday=0,
+            extra_args=["--window-days", "30", "--min-importance", "0.85", "--min-recurrence", "3"],
         )
         write_launchd_plist(
             out / "com.openclaw.memory.weekly.plist",

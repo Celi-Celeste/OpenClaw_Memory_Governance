@@ -53,6 +53,8 @@ def main() -> int:
         "memory_lib.py",
         "hourly_semantic_extract.py",
         "daily_consolidate.py",
+        "confidence_gate.py",
+        "weekly_identity_promote.py",
         "weekly_drift_review.py",
         "transcript_lookup.py",
         "render_schedule.py",

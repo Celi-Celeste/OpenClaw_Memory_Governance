@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import Dict, List
 
-from memory_lib import ensure_workspace_layout, parse_date_from_filename
+from memory_lib import DEFAULT_TRANSCRIPT_ROOT, ensure_workspace_layout, parse_date_from_filename, resolve_transcript_root
 
 
 def tokenize(text: str) -> List[str]:
@@ -38,6 +38,11 @@ def parse_transcript_sections(path: Path) -> List[Dict]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace", default=".", help="OpenClaw workspace root.")
+    parser.add_argument(
+        "--transcript-root",
+        default=DEFAULT_TRANSCRIPT_ROOT,
+        help="Transcript mirror root path. Relative paths are resolved from workspace root.",
+    )
     parser.add_argument("--topic", required=True)
     parser.add_argument("--last-n-days", type=int, default=7)
     parser.add_argument("--max-excerpts", type=int, default=5)
@@ -46,7 +51,7 @@ def main() -> int:
 
     workspace = Path(args.workspace).resolve()
     ensure_workspace_layout(workspace)
-    transcript_dir = workspace / "memory" / "transcripts"
+    transcript_dir = resolve_transcript_root(workspace, args.transcript_root)
     transcript_dir.mkdir(parents=True, exist_ok=True)
 
     topic_tokens = set(tokenize(args.topic))

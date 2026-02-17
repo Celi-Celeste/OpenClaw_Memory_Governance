@@ -36,6 +36,11 @@ python3 render_schedule.py --workspace "$HOME/.openclaw/workspace" --agent-id ma
 
 Install the generated cron lines in `crontab -e`, or generate launchd plists.
 
+Notes:
+
+1. Transcript mirror defaults to `archive/transcripts/` (outside `memory/`).
+2. Weekly cadence now includes identity promotion before drift review.
+
 ## 4) Validate
 
 ```bash

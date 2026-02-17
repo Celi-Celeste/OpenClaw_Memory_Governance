@@ -27,8 +27,9 @@ Enforce this workspace layout:
 2. `memory/semantic/YYYY-MM.md`
 3. `memory/identity/identity.md`
 4. `memory/identity/preferences.md`
-5. `memory/transcripts/YYYY-MM-DD.md`
-6. `memory/drift-log.md`
+5. `memory/identity/decisions.md`
+6. `archive/transcripts/YYYY-MM-DD.md`
+7. `memory/drift-log.md`
 
 Keep transcript files out of default semantic retrieval. Use transcript lookup only on demand.
 
@@ -61,18 +62,33 @@ Run these scripts from `scripts/` with `--workspace <path>`:
 2. `daily_consolidate.py`
 - Consolidate duplicate semantic entries.
 - Prune episodic files older than retention.
-- Build and rotate 7-day transcript mirror.
+- Build and rotate 7-day transcript mirror at `archive/transcripts`.
+- Refuse transcript roots under `memory/` unless explicitly overridden.
 
-3. `weekly_drift_review.py`
+3. `weekly_identity_promote.py`
+- Promote recurring semantic facts into identity files.
+- Route using fixed taxonomy:
+  - `preferences.md` for preference/style tags
+  - `decisions.md` for decision/policy tags
+  - `identity.md` for all other durable truths
+- Default thresholds: `importance >= 0.85` and `recurrence >= 3` in 30 days.
+
+4. `weekly_drift_review.py`
 - Classify new-vs-existing semantic memories as `REINFORCES`, `REFINES`, `SUPERSEDES`, `UNRELATED`.
 - Mark superseded entries `historical` without deletion.
 - Append actions to `memory/drift-log.md`.
 
-4. `transcript_lookup.py`
+5. `transcript_lookup.py`
 - Return bounded transcript excerpts for user-approved lookups.
 - Never inject full transcript files.
 
-5. `render_schedule.py`
+6. `confidence_gate.py`
+- Evaluate retrieval confidence before final answer.
+- Return JSON action:
+  - `respond_normally`
+  - `partial_and_ask_lookup`
+
+7. `render_schedule.py`
 - Print crontab entries and optionally generate launchd plists.
 - Use this to install routine hourly/daily/weekly cadence jobs.
 
@@ -88,6 +104,12 @@ Use thresholds:
 
 When low confidence is detected, ask permission:
 "I may be missing specifics. Want me to check transcripts for the last 7 days?"
+
+Identity recall priority within identity layer:
+
+1. `identity.md`
+2. `preferences.md`
+3. `decisions.md`
 
 ## Hard Boundary
 
@@ -109,8 +131,10 @@ Run:
 Use smoke results to verify:
 
 1. identity -> semantic -> episodic retrieval ordering remains possible
-2. transcript lookup is bounded
-3. superseded memories are down-ranked to `historical`
+2. transcript mirror lives under `archive/transcripts`
+3. transcript lookup is bounded
+4. superseded memories are down-ranked to `historical`
+5. identity promotion writes to the correct destination files
 
 ## References
 

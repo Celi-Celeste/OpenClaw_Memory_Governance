@@ -19,10 +19,11 @@ Implement as scripts and prompts in this skill package:
 2. Importance scoring and routing
 3. Hourly semantic extraction
 4. Daily consolidation and pruning
-5. Weekly drift classification and soft forgetting
-6. 7-day transcript mirror generation
-7. On-demand transcript lookup tool behavior
-8. Confidence-gated recall suggestions
+5. Weekly identity promotion
+6. Weekly drift classification and soft forgetting
+7. 7-day transcript mirror generation in archive root
+8. On-demand transcript lookup tool behavior
+9. Confidence-gated recall suggestions
 
 ## Hard boundary
 

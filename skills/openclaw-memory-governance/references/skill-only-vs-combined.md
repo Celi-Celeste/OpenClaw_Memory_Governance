@@ -18,8 +18,9 @@ Works and remains useful. You still get:
 1. layered memory schema discipline
 2. cadence scripts (hourly/daily/weekly)
 3. transcript mirror + bounded lookup
-4. drift classify + soft forgetting
-5. confidence-gate response policy guidance
+4. deterministic weekly identity promotion
+5. drift classify + soft forgetting
+6. confidence-gate response policy + executable gate script
 
 Missing in skill-only mode:
 
@@ -34,8 +35,9 @@ Works and improves runtime defaults, but lacks advanced governance:
 
 1. no importance-based promotions
 2. no transcript mirror lifecycle
-3. no weekly drift revise/forget logic
-4. no confidence-gated transcript suggestion behavior
+3. no weekly identity promotion
+4. no weekly drift revise/forget logic
+5. no confidence-gated transcript suggestion behavior
 
 ## Combined mode (recommended)
 

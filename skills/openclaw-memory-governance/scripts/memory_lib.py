@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 ENTRY_RE = re.compile(r"^###\s+mem:([a-zA-Z0-9_-]+)\s*$")
+DEFAULT_TRANSCRIPT_ROOT = "archive/transcripts"
+LEGACY_TRANSCRIPT_ROOT = "memory/transcripts"
 
 DEFAULT_META_ORDER = [
     "time",
@@ -72,7 +74,7 @@ def ensure_workspace_layout(workspace: Path) -> None:
         "memory/episodic",
         "memory/semantic",
         "memory/identity",
-        "memory/transcripts",
+        DEFAULT_TRANSCRIPT_ROOT,
     ]:
         (workspace / sub).mkdir(parents=True, exist_ok=True)
 
@@ -85,8 +87,22 @@ def semantic_file(workspace: Path, day: dt.date) -> Path:
     return workspace / "memory" / "semantic" / f"{day.strftime('%Y-%m')}.md"
 
 
-def transcript_file(workspace: Path, day: dt.date) -> Path:
-    return workspace / "memory" / "transcripts" / f"{day.isoformat()}.md"
+def resolve_transcript_root(workspace: Path, transcript_root: str) -> Path:
+    root = Path(transcript_root).expanduser()
+    if not root.is_absolute():
+        root = workspace / root
+    return root.resolve()
+
+
+def is_under_root(path: Path, root: Path) -> bool:
+    path = path.resolve()
+    root = root.resolve()
+    return path == root or root in path.parents
+
+
+def transcript_file(workspace: Path, day: dt.date, transcript_root: str = DEFAULT_TRANSCRIPT_ROOT) -> Path:
+    root = resolve_transcript_root(workspace, transcript_root)
+    return root / f"{day.isoformat()}.md"
 
 
 def parse_memory_file(path: Path) -> Tuple[str, List[MemoryEntry]]:

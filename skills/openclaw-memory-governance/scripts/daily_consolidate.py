@@ -6,18 +6,22 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import shutil
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 from memory_lib import (
+    DEFAULT_TRANSCRIPT_ROOT,
+    LEGACY_TRANSCRIPT_ROOT,
     MemoryEntry,
     ensure_workspace_layout,
+    is_under_root,
     normalize_text,
     parse_date_from_filename,
     parse_memory_file,
     parse_iso_date,
-    transcript_file,
+    resolve_transcript_root,
     write_memory_file,
 )
 
@@ -148,10 +152,10 @@ def _iter_session_events(sessions_dir: Path, since_date: dt.date) -> Iterable[Tu
 def build_transcript_mirror(
     workspace: Path,
     sessions_dir: Path | None,
+    transcript_dir: Path,
     retention_days: int,
     dry_run: bool,
 ) -> Tuple[int, int]:
-    transcript_dir = workspace / "memory" / "transcripts"
     transcript_dir.mkdir(parents=True, exist_ok=True)
     today = dt.date.today()
     since = today - dt.timedelta(days=retention_days - 1)
@@ -168,7 +172,7 @@ def build_transcript_mirror(
                 out.append(f"## {ts.strftime('%H:%M:%S')} - {role} ({source})")
                 out.append(text)
                 out.append("")
-            path = transcript_file(workspace, day)
+            path = transcript_dir / f"{day.isoformat()}.md"
             written += 1
             if not dry_run:
                 path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
@@ -181,6 +185,28 @@ def build_transcript_mirror(
             if not dry_run:
                 path.unlink(missing_ok=True)
     return written, removed
+
+
+def migrate_legacy_transcripts(workspace: Path, transcript_dir: Path, dry_run: bool) -> Tuple[int, int]:
+    legacy_dir = resolve_transcript_root(workspace, LEGACY_TRANSCRIPT_ROOT)
+    if transcript_dir == legacy_dir or not legacy_dir.exists():
+        return 0, 0
+
+    legacy_files = sorted(legacy_dir.glob("*.md"))
+    if not legacy_files:
+        return 0, 0
+
+    transcript_dir.mkdir(parents=True, exist_ok=True)
+    existing_files = sorted(transcript_dir.glob("*.md"))
+    if existing_files:
+        return 0, len(legacy_files)
+
+    migrated = 0
+    for legacy_file in legacy_files:
+        migrated += 1
+        if not dry_run:
+            shutil.move(str(legacy_file), str(transcript_dir / legacy_file.name))
+    return migrated, 0
 
 
 def resolve_sessions_dir(args: argparse.Namespace) -> Path | None:
@@ -196,6 +222,16 @@ def main() -> int:
     parser.add_argument("--workspace", default=".", help="OpenClaw workspace root.")
     parser.add_argument("--episodic-retention-days", type=int, default=14)
     parser.add_argument("--transcript-retention-days", type=int, default=7)
+    parser.add_argument(
+        "--transcript-root",
+        default=DEFAULT_TRANSCRIPT_ROOT,
+        help="Transcript mirror root path. Relative paths are resolved from workspace root.",
+    )
+    parser.add_argument(
+        "--allow-transcripts-under-memory",
+        action="store_true",
+        help="Allow transcript root under memory/. Disabled by default to preserve retrieval isolation.",
+    )
     parser.add_argument("--sessions-dir", default="", help="Path to OpenClaw sessions directory.")
     parser.add_argument("--agent-id", default="", help="Agent id used to infer ~/.openclaw/agents/<id>/sessions.")
     parser.add_argument("--dry-run", action="store_true")
@@ -204,12 +240,26 @@ def main() -> int:
     workspace = Path(args.workspace).resolve()
     ensure_workspace_layout(workspace)
     sessions_dir = resolve_sessions_dir(args)
+    transcript_dir = resolve_transcript_root(workspace, args.transcript_root)
+    memory_dir = (workspace / "memory").resolve()
+    if is_under_root(transcript_dir, memory_dir) and not args.allow_transcripts_under_memory:
+        raise SystemExit(
+            "Refusing transcript root under memory/. Use --transcript-root outside memory/, "
+            "or pass --allow-transcripts-under-memory to override."
+        )
+
+    migrated, legacy_conflicts = migrate_legacy_transcripts(
+        workspace,
+        transcript_dir=transcript_dir,
+        dry_run=args.dry_run,
+    )
 
     deduped = consolidate_semantic(workspace, dry_run=args.dry_run)
     pruned = prune_episodic(workspace, retention_days=args.episodic_retention_days, dry_run=args.dry_run)
     written, removed = build_transcript_mirror(
         workspace,
         sessions_dir=sessions_dir,
+        transcript_dir=transcript_dir,
         retention_days=args.transcript_retention_days,
         dry_run=args.dry_run,
     )
@@ -218,8 +268,11 @@ def main() -> int:
         "daily_consolidate "
         f"semantic_deduped={deduped} "
         f"episodic_pruned={pruned} "
+        f"transcript_root={transcript_dir} "
         f"transcripts_written={written} "
-        f"transcripts_removed={removed}"
+        f"transcripts_removed={removed} "
+        f"legacy_migrated={migrated} "
+        f"legacy_conflicts={legacy_conflicts}"
     )
     return 0
 

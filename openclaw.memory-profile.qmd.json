@@ -69,14 +69,7 @@
             }
           }
         ]
-      },
-      "paths": [
-        {
-          "name": "memory",
-          "path": "./memory",
-          "pattern": "**/*.md"
-        }
-      ]
+      }
     }
   },
   "session": {

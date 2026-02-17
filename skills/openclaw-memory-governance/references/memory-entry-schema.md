@@ -27,4 +27,9 @@ Concise memory statement.
 7. `tags`
 8. `supersedes`
 
+## Optional metadata keys used by scripts
+
+1. `origin_id`
+2. `recurrence`
+
 Unknown metadata keys are preserved by scripts.

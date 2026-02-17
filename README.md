@@ -10,6 +10,7 @@ This project adds operational memory governance on top of OpenClaw:
 2. Cadence jobs:
    - Hourly semantic extraction
    - Daily consolidation + transcript mirror rotation
+   - Weekly identity promotion
    - Weekly drift review with soft supersede (`historical` status)
 3. On-demand transcript recall (bounded excerpts, not full transcript dumps)
 4. Confidence-gated behavior for weak recall scenarios
@@ -86,6 +87,8 @@ cd <repo-root>/skills/openclaw-memory-governance/scripts
 python3 render_schedule.py --workspace "$HOME/.openclaw/workspace" --agent-id main
 ```
 
+Default transcript mirror root is `archive/transcripts/` so transcript precision recall stays outside default memory indexing.
+
 Optional macOS launchd plist generation:
 
 ```bash
@@ -136,4 +139,4 @@ Docs entrypoint:
 
 ## License
 
-Add the license that matches your OpenClaw project publishing policy (MIT or Apache-2.0 are common choices).
+This repository currently uses the MIT license (`LICENSE`).
