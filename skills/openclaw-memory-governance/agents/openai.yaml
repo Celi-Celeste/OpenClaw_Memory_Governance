@@ -1,0 +1,7 @@
+interface:
+  display_name: "OpenClaw Memory Governance"
+  short_description: "Upgrade-safe memory cadence, drift, and transcript recall."
+  default_prompt: "Use $openclaw-memory-governance to apply config-vs-skill memory governance and run cadence jobs."
+
+policy:
+  allow_implicit_invocation: true
