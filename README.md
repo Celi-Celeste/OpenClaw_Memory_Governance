@@ -62,7 +62,7 @@ Apply one config profile **and** install the skill package.
 ### A) Validate locally
 
 ```bash
-cd "/Users/celeste/Documents/New project"
+cd <repo-root>
 source .venv/bin/activate
 python3 skills/openclaw-memory-governance/scripts/smoke_suite.py
 python3 skills/openclaw-memory-governance/scripts/quick_validate_local.py
@@ -71,18 +71,18 @@ python3 skills/openclaw-memory-governance/scripts/quick_validate_local.py
 ### B) Build upload bundle for ClawHub
 
 ```bash
-cd "/Users/celeste/Documents/New project/skills/openclaw-memory-governance"
+cd <repo-root>/skills/openclaw-memory-governance
 ./scripts/build_clawhub_bundle.sh
 ```
 
 Bundle output:
 
-`/Users/celeste/Documents/New project/skills/openclaw-memory-governance/dist/openclaw-memory-governance.zip`
+`skills/openclaw-memory-governance/dist/openclaw-memory-governance.zip`
 
 ### C) Generate scheduler commands
 
 ```bash
-cd "/Users/celeste/Documents/New project/skills/openclaw-memory-governance/scripts"
+cd <repo-root>/skills/openclaw-memory-governance/scripts
 python3 render_schedule.py --workspace "$HOME/.openclaw/workspace" --agent-id main
 ```
 
@@ -100,7 +100,7 @@ python3 render_schedule.py \
 This repo is ready for GitHub publishing. If your GitHub repo already exists:
 
 ```bash
-cd "/Users/celeste/Documents/New project"
+cd <repo-root>
 git add .
 git commit -m "Initial release: OpenClaw memory governance skill + docs"
 git remote add origin <YOUR_GITHUB_REPO_URL>
@@ -116,13 +116,13 @@ git push -u origin main
 
 Detailed first-time publishing steps:
 
-`/Users/celeste/Documents/New project/docs/github-publishing.md`
+`docs/github-publishing.md`
 
 ## Documentation Site (GitHub Pages)
 
 A Pages workflow is included at:
 
-`/Users/celeste/Documents/New project/.github/workflows/pages.yml`
+`.github/workflows/pages.yml`
 
 After pushing to GitHub:
 
@@ -132,7 +132,7 @@ After pushing to GitHub:
 
 Docs entrypoint:
 
-`/Users/celeste/Documents/New project/docs/index.md`
+`docs/index.md`
 
 ## License
 

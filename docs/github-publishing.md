@@ -15,7 +15,7 @@ In your OpenClaw GitHub account:
 Use the repository URL GitHub gives you:
 
 ```bash
-cd "/Users/celeste/Documents/New project"
+cd <repo-root>
 git remote add origin <YOUR_GITHUB_REPO_URL>
 ```
 
@@ -28,7 +28,7 @@ git remote set-url origin <YOUR_GITHUB_REPO_URL>
 ## 3) Commit and Push
 
 ```bash
-cd "/Users/celeste/Documents/New project"
+cd <repo-root>
 git add .
 git commit -m "Initial release: OpenClaw memory governance skill + docs"
 git push -u origin main
@@ -40,7 +40,7 @@ If Git asks you to authenticate, sign in using your OpenClaw GitHub account.
 
 This repository includes:
 
-`/Users/celeste/Documents/New project/.github/workflows/pages.yml`
+`.github/workflows/pages.yml`
 
 After first push:
 
@@ -54,7 +54,6 @@ Your docs site will publish from the `docs/` folder via workflow.
 
 Skill bundle path:
 
-`/Users/celeste/Documents/New project/skills/openclaw-memory-governance/dist/openclaw-memory-governance.zip`
+`skills/openclaw-memory-governance/dist/openclaw-memory-governance.zip`
 
 You can attach this zip to a GitHub Release so users can download and upload directly to ClawHub.
-
