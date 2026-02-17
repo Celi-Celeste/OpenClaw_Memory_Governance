@@ -27,6 +27,16 @@ DEFAULT_META_ORDER = [
     "supersedes",
 ]
 
+PRIVATE_KEY_BLOCK_RE = re.compile(
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----",
+    re.MULTILINE,
+)
+BEARER_TOKEN_RE = re.compile(r"(?i)\bbearer\s+[a-z0-9._~+/=-]{16,}")
+OPENAI_KEY_RE = re.compile(r"\bsk-[a-zA-Z0-9]{16,}\b")
+GENERIC_SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(api[_-]?key|access[_-]?token|token|secret|password)\b\s*[:=]\s*([^\s,;]+)"
+)
+
 
 @dataclass
 class MemoryEntry:
@@ -98,6 +108,19 @@ def is_under_root(path: Path, root: Path) -> bool:
     path = path.resolve()
     root = root.resolve()
     return path == root or root in path.parents
+
+
+def redact_secrets(text: str) -> str:
+    value = PRIVATE_KEY_BLOCK_RE.sub("<REDACTED:PRIVATE_KEY_BLOCK>", text)
+    value = BEARER_TOKEN_RE.sub("Bearer <REDACTED>", value)
+    value = OPENAI_KEY_RE.sub("<REDACTED:API_KEY>", value)
+
+    def _replace_assignment(match: re.Match[str]) -> str:
+        key = match.group(1)
+        return f"{key}=<REDACTED>"
+
+    value = GENERIC_SECRET_ASSIGNMENT_RE.sub(_replace_assignment, value)
+    return value
 
 
 def transcript_file(workspace: Path, day: dt.date, transcript_root: str = DEFAULT_TRANSCRIPT_ROOT) -> Path:

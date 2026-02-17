@@ -10,7 +10,14 @@ import re
 from pathlib import Path
 from typing import Dict, List
 
-from memory_lib import DEFAULT_TRANSCRIPT_ROOT, ensure_workspace_layout, parse_date_from_filename, resolve_transcript_root
+from memory_lib import (
+    DEFAULT_TRANSCRIPT_ROOT,
+    ensure_workspace_layout,
+    is_under_root,
+    parse_date_from_filename,
+    redact_secrets,
+    resolve_transcript_root,
+)
 
 
 def tokenize(text: str) -> List[str]:
@@ -43,6 +50,11 @@ def main() -> int:
         default=DEFAULT_TRANSCRIPT_ROOT,
         help="Transcript mirror root path. Relative paths are resolved from workspace root.",
     )
+    parser.add_argument(
+        "--allow-external-transcript-root",
+        action="store_true",
+        help="Allow transcript root outside workspace root. Disabled by default for safety.",
+    )
     parser.add_argument("--topic", required=True)
     parser.add_argument("--last-n-days", type=int, default=7)
     parser.add_argument("--max-excerpts", type=int, default=5)
@@ -52,6 +64,11 @@ def main() -> int:
     workspace = Path(args.workspace).resolve()
     ensure_workspace_layout(workspace)
     transcript_dir = resolve_transcript_root(workspace, args.transcript_root)
+    if not is_under_root(transcript_dir, workspace) and not args.allow_external_transcript_root:
+        raise SystemExit(
+            "Refusing transcript root outside workspace. Keep transcripts under workspace/, "
+            "or pass --allow-external-transcript-root to override."
+        )
     transcript_dir.mkdir(parents=True, exist_ok=True)
 
     topic_tokens = set(tokenize(args.topic))
@@ -59,26 +76,31 @@ def main() -> int:
     results: List[Dict] = []
 
     for path in sorted(transcript_dir.glob("*.md")):
+        if path.is_symlink():
+            continue
+        resolved = path.resolve()
+        if not is_under_root(resolved, transcript_dir):
+            continue
         day = parse_date_from_filename(path.name)
         if not day or day < cutoff:
             continue
-        for sec in parse_transcript_sections(path):
+        for sec in parse_transcript_sections(resolved):
             haystack = f"{sec['header']} {sec['body']}".lower()
             if not haystack.strip():
                 continue
             score = sum(1 for tok in topic_tokens if tok in haystack)
             if score <= 0:
                 continue
-            excerpt = sec["body"].strip()
+            excerpt = redact_secrets(sec["body"].strip())
             if len(excerpt) > args.max_chars_per_excerpt:
                 excerpt = excerpt[: args.max_chars_per_excerpt - 3].rstrip() + "..."
             results.append(
                 {
                     "date": day.isoformat(),
-                    "header": sec["header"],
+                    "header": redact_secrets(sec["header"]),
                     "score": score,
                     "excerpt": excerpt,
-                    "source_ref": str(path.relative_to(workspace)),
+                    "source_ref": str(resolved.relative_to(workspace)),
                 }
             )
 

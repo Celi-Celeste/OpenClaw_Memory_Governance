@@ -14,6 +14,10 @@ This project adds operational memory governance on top of OpenClaw:
    - Weekly drift review with soft supersede (`historical` status)
 3. On-demand transcript recall (bounded excerpts, not full transcript dumps)
 4. Confidence-gated behavior for weak recall scenarios
+5. Transcript privacy hardening:
+   - default sanitized mirror mode (secret redaction)
+   - restrictive transcript file permissions (`0600`)
+   - safe transcript lookup (symlink ignore + bounded output redaction)
 
 ## Why This Is Upgrade-Safe
 
@@ -87,7 +91,7 @@ cd <repo-root>/skills/openclaw-memory-governance/scripts
 python3 render_schedule.py --workspace "$HOME/.openclaw/workspace" --agent-id main
 ```
 
-Default transcript mirror root is `archive/transcripts/` so transcript precision recall stays outside default memory indexing.
+Default transcript mirror root is `archive/transcripts/` and default transcript mode is `sanitized`, so precision recall stays outside default memory indexing while reducing secret spill risk.
 
 Optional macOS launchd plist generation:
 
@@ -96,6 +100,16 @@ python3 render_schedule.py \
   --workspace "$HOME/.openclaw/workspace" \
   --agent-id main \
   --launchd-dir "$HOME/.openclaw/memory-plists"
+```
+
+Optional high-security mode (disable transcript mirror files):
+
+```bash
+python3 daily_consolidate.py \
+  --workspace "$HOME/.openclaw/workspace" \
+  --agent-id main \
+  --transcript-root archive/transcripts \
+  --transcript-mode off
 ```
 
 ## GitHub Publishing

@@ -39,7 +39,12 @@ Install the generated cron lines in `crontab -e`, or generate launchd plists.
 Notes:
 
 1. Transcript mirror defaults to `archive/transcripts/` (outside `memory/`).
-2. Weekly cadence now includes identity promotion before drift review.
+2. Transcript mirror defaults to `--transcript-mode sanitized` (secret redaction + `0600` file permissions).
+3. Weekly cadence now includes identity promotion before drift review.
+
+Optional high-security mode:
+
+Set daily job to `--transcript-mode off` to disable transcript mirror files.
 
 ## 4) Validate
 

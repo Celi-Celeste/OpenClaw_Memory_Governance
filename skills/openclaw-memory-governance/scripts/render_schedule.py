@@ -5,16 +5,38 @@ from __future__ import annotations
 
 import argparse
 import plistlib
+import shlex
 from pathlib import Path
 
 
 def cron_lines(workspace: Path, scripts_dir: Path, agent_id: str) -> list[str]:
     logs = workspace / "memory" / "logs"
+    q = shlex.quote
     lines = [
-        f"0 * * * * /usr/bin/env python3 {scripts_dir / 'hourly_semantic_extract.py'} --workspace {workspace} >> {logs / 'hourly.log'} 2>&1",
-        f"10 3 * * * /usr/bin/env python3 {scripts_dir / 'daily_consolidate.py'} --workspace {workspace} --agent-id {agent_id} --transcript-root archive/transcripts >> {logs / 'daily.log'} 2>&1",
-        f"10 4 * * 0 /usr/bin/env python3 {scripts_dir / 'weekly_identity_promote.py'} --workspace {workspace} --window-days 30 --min-importance 0.85 --min-recurrence 3 >> {logs / 'weekly-identity.log'} 2>&1",
-        f"20 4 * * 0 /usr/bin/env python3 {scripts_dir / 'weekly_drift_review.py'} --workspace {workspace} --window-days 7 >> {logs / 'weekly-drift.log'} 2>&1",
+        f"0 * * * * /usr/bin/env python3 {q(str(scripts_dir / 'hourly_semantic_extract.py'))} --workspace {q(str(workspace))} >> {q(str(logs / 'hourly.log'))} 2>&1",
+        (
+            "10 3 * * * /usr/bin/env python3 "
+            f"{q(str(scripts_dir / 'daily_consolidate.py'))} "
+            f"--workspace {q(str(workspace))} "
+            f"--agent-id {q(agent_id)} "
+            "--transcript-root archive/transcripts "
+            "--transcript-mode sanitized "
+            f">> {q(str(logs / 'daily.log'))} 2>&1"
+        ),
+        (
+            "10 4 * * 0 /usr/bin/env python3 "
+            f"{q(str(scripts_dir / 'weekly_identity_promote.py'))} "
+            f"--workspace {q(str(workspace))} "
+            "--window-days 30 --min-importance 0.85 --min-recurrence 3 "
+            f">> {q(str(logs / 'weekly-identity.log'))} 2>&1"
+        ),
+        (
+            "20 4 * * 0 /usr/bin/env python3 "
+            f"{q(str(scripts_dir / 'weekly_drift_review.py'))} "
+            f"--workspace {q(str(workspace))} "
+            "--window-days 7 "
+            f">> {q(str(logs / 'weekly-drift.log'))} 2>&1"
+        ),
     ]
     return lines
 
@@ -83,7 +105,14 @@ def main() -> int:
             logs_dir,
             hour=3,
             minute=10,
-            extra_args=["--agent-id", args.agent_id, "--transcript-root", "archive/transcripts"],
+            extra_args=[
+                "--agent-id",
+                args.agent_id,
+                "--transcript-root",
+                "archive/transcripts",
+                "--transcript-mode",
+                "sanitized",
+            ],
         )
         write_launchd_plist(
             out / "com.openclaw.memory.weekly-identity.plist",

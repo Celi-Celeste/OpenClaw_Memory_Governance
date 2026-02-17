@@ -24,6 +24,7 @@ Implement as scripts and prompts in this skill package:
 7. 7-day transcript mirror generation in archive root
 8. On-demand transcript lookup tool behavior
 9. Confidence-gated recall suggestions
+10. Transcript privacy controls (`--transcript-mode sanitized|full|off`, lookup redaction)
 
 ## Hard boundary
 

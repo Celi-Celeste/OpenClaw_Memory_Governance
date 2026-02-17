@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
+import stat
 import subprocess
 import tempfile
 from pathlib import Path
@@ -13,7 +15,12 @@ from memory_lib import write_memory_file
 
 
 def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=str(cwd), check=True, capture_output=True, text=True)
+    proc = subprocess.run(cmd, cwd=str(cwd), check=False, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise AssertionError(
+            f"command failed: {' '.join(cmd)}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+    return proc
 
 
 def run_maybe_fail(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
@@ -129,12 +136,28 @@ def main() -> int:
         assert "status: historical" in reviewed, "weekly drift review did not mark superseded entry historical"
 
         # Seed session transcript for daily mirror build.
-        event = {
-            "timestamp": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-            "role": "user",
-            "content": "Please revisit memory cadence and transcript lookup details.",
-        }
-        (sessions_dir / "session-a.jsonl").write_text(json.dumps(event) + "\n", encoding="utf-8")
+        event_ts = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        events = [
+            {
+                "timestamp": event_ts,
+                "role": "user",
+                "content": (
+                    "Please revisit memory cadence and transcript lookup details. "
+                    "api_key=sk-1234567890ABCDEFGHIJKLMNOP"
+                ),
+            },
+            {
+                "timestamp": event_ts,
+                "role": "assistant",
+                "internal_payload": {
+                    "debug_token": "Bearer abcdefghijklmnopqrstuvwxyz123456",
+                },
+            },
+        ]
+        (sessions_dir / "session-a.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in events) + "\n",
+            encoding="utf-8",
+        )
         legacy_day = today - dt.timedelta(days=1)
         legacy_transcript = workspace / "memory" / "transcripts" / f"{legacy_day.isoformat()}.md"
         legacy_transcript.write_text(
@@ -154,6 +177,22 @@ def main() -> int:
             cwd=script_dir,
         )
         assert guard.returncode != 0, "daily transcript root guard failed to block memory/transcripts"
+
+        external_root = workspace.parent / "outside-transcripts"
+        external_root.mkdir(parents=True, exist_ok=True)
+        external_guard = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                str(external_root),
+            ],
+            cwd=script_dir,
+        )
+        assert external_guard.returncode != 0, "daily transcript root guard failed to block external transcript root"
+
         run(
             [
                 "python3",
@@ -164,6 +203,8 @@ def main() -> int:
                 str(sessions_dir),
                 "--transcript-root",
                 "archive/transcripts",
+                "--transcript-mode",
+                "sanitized",
                 "--episodic-retention-days",
                 "14",
                 "--transcript-retention-days",
@@ -177,6 +218,12 @@ def main() -> int:
         assert transcript.exists(), "daily transcript mirror not created in archive/transcripts"
         assert (transcript_root / f"{legacy_day.isoformat()}.md").exists(), "legacy transcript was not migrated"
         assert not legacy_transcript.exists(), "legacy transcript file was not moved"
+        transcript_text = transcript.read_text(encoding="utf-8")
+        assert "<REDACTED>" in transcript_text, "daily transcript mirror did not redact sensitive content"
+        assert "sk-1234567890ABCDEFGHIJKLMNOP" not in transcript_text, "daily transcript mirror leaked raw API key"
+        assert "internal_payload" not in transcript_text, "daily transcript mirror should skip non-text session payloads"
+        mode = stat.S_IMODE(transcript.stat().st_mode)
+        assert mode == 0o600, f"daily transcript mirror permissions should be 0600, got {oct(mode)}"
 
         lookup = run(
             [
@@ -197,6 +244,67 @@ def main() -> int:
         )
         parsed = json.loads(lookup.stdout)
         assert parsed["results"], "transcript lookup returned no results"
+
+        if hasattr(os, "symlink"):
+            symlink_day = today - dt.timedelta(days=2)
+            symlink_target = workspace / "outside-target.md"
+            symlink_target.write_text(
+                f"# {symlink_day.isoformat()}\n\n## 08:00:00 - user (external)\nunique external phrase\n",
+                encoding="utf-8",
+            )
+            symlink_path = transcript_root / f"{symlink_day.isoformat()}.md"
+            if symlink_path.exists():
+                symlink_path.unlink()
+            os.symlink(symlink_target, symlink_path)
+            symlink_lookup = run(
+                [
+                    "python3",
+                    str(script_dir / "transcript_lookup.py"),
+                    "--workspace",
+                    str(workspace),
+                    "--transcript-root",
+                    "archive/transcripts",
+                    "--topic",
+                    "unique external phrase",
+                    "--last-n-days",
+                    "7",
+                    "--max-excerpts",
+                    "5",
+                ],
+                cwd=script_dir,
+            )
+            symlink_results = json.loads(symlink_lookup.stdout)
+            assert not symlink_results["results"], "transcript lookup should ignore symlink transcript files"
+
+        lookup_external_guard = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "transcript_lookup.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                str(external_root),
+                "--topic",
+                "memory cadence",
+            ],
+            cwd=script_dir,
+        )
+        assert lookup_external_guard.returncode != 0, "transcript lookup root guard failed to block external path"
+
+        run(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                "archive/transcripts",
+                "--transcript-mode",
+                "off",
+            ],
+            cwd=script_dir,
+        )
+        assert not list(transcript_root.glob("*.md")), "transcript-mode off should remove transcript mirror files"
 
         low_conf = run(
             [

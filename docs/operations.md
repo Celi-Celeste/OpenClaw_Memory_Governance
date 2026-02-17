@@ -11,6 +11,18 @@ Default transcript mirror root:
 
 `archive/transcripts/`
 
+Default transcript mode:
+
+`sanitized`
+
+Daily command example:
+
+`daily_consolidate.py --workspace "<workspace>" --agent-id main --transcript-root archive/transcripts --transcript-mode sanitized`
+
+Optional high-security mode:
+
+`daily_consolidate.py --workspace "<workspace>" --agent-id main --transcript-root archive/transcripts --transcript-mode off`
+
 ## Transcript Lookup
 
 Use:
@@ -20,8 +32,9 @@ Use:
 Behavior:
 
 1. Searches transcript mirror files only
-2. Returns bounded excerpts
-3. Avoids context flooding
+2. Ignores symlink transcript files
+3. Returns bounded excerpts with secret redaction
+4. Avoids context flooding
 
 ## Confidence Gate Policy
 

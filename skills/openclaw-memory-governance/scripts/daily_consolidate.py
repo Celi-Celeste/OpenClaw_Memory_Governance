@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import shutil
 from collections import defaultdict
 from pathlib import Path
@@ -21,6 +22,7 @@ from memory_lib import (
     parse_date_from_filename,
     parse_memory_file,
     parse_iso_date,
+    redact_secrets,
     resolve_transcript_root,
     write_memory_file,
 )
@@ -123,10 +125,14 @@ def _extract_text(obj: Dict) -> str:
                 chunks.append(item.strip())
         if chunks:
             return " ".join(chunks)
-    return json.dumps(obj, ensure_ascii=True)
+    return ""
 
 
-def _iter_session_events(sessions_dir: Path, since_date: dt.date) -> Iterable[Tuple[dt.datetime, str, str, str]]:
+def _iter_session_events(
+    sessions_dir: Path,
+    since_date: dt.date,
+    transcript_mode: str,
+) -> Iterable[Tuple[dt.datetime, str, str, str]]:
     for jsonl in sorted(sessions_dir.glob("*.jsonl")):
         fallback_ts = dt.datetime.fromtimestamp(jsonl.stat().st_mtime, tz=dt.timezone.utc)
         with jsonl.open("r", encoding="utf-8") as fh:
@@ -143,7 +149,11 @@ def _iter_session_events(sessions_dir: Path, since_date: dt.date) -> Iterable[Tu
                     continue
                 role = _extract_role(obj)
                 text = _extract_text(obj)
+                if not text:
+                    continue
                 text = " ".join(text.split())
+                if transcript_mode == "sanitized":
+                    text = redact_secrets(text)
                 if len(text) > 1500:
                     text = text[:1497] + "..."
                 yield (ts, role, text, jsonl.name)
@@ -154,16 +164,26 @@ def build_transcript_mirror(
     sessions_dir: Path | None,
     transcript_dir: Path,
     retention_days: int,
+    transcript_mode: str,
     dry_run: bool,
 ) -> Tuple[int, int]:
-    transcript_dir.mkdir(parents=True, exist_ok=True)
     today = dt.date.today()
     since = today - dt.timedelta(days=retention_days - 1)
 
+    if transcript_mode == "off":
+        removed = 0
+        if transcript_dir.exists():
+            for path in sorted(transcript_dir.glob("*.md")):
+                removed += 1
+                if not dry_run:
+                    path.unlink(missing_ok=True)
+        return 0, removed
+
+    transcript_dir.mkdir(parents=True, exist_ok=True)
     written = 0
     if sessions_dir and sessions_dir.exists():
         by_day: Dict[dt.date, List[Tuple[dt.datetime, str, str, str]]] = defaultdict(list)
-        for item in _iter_session_events(sessions_dir, since_date=since):
+        for item in _iter_session_events(sessions_dir, since_date=since, transcript_mode=transcript_mode):
             by_day[item[0].date()].append(item)
         for day, events in sorted(by_day.items()):
             events.sort(key=lambda x: x[0])
@@ -176,6 +196,10 @@ def build_transcript_mirror(
             written += 1
             if not dry_run:
                 path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+                try:
+                    os.chmod(path, 0o600)
+                except OSError:
+                    pass
 
     removed = 0
     for path in sorted(transcript_dir.glob("*.md")):
@@ -232,6 +256,17 @@ def main() -> int:
         action="store_true",
         help="Allow transcript root under memory/. Disabled by default to preserve retrieval isolation.",
     )
+    parser.add_argument(
+        "--allow-external-transcript-root",
+        action="store_true",
+        help="Allow transcript root outside the workspace root. Disabled by default for safety.",
+    )
+    parser.add_argument(
+        "--transcript-mode",
+        choices=["sanitized", "full", "off"],
+        default="sanitized",
+        help="sanitized=redact likely secrets, full=raw transcript text, off=disable mirror files.",
+    )
     parser.add_argument("--sessions-dir", default="", help="Path to OpenClaw sessions directory.")
     parser.add_argument("--agent-id", default="", help="Agent id used to infer ~/.openclaw/agents/<id>/sessions.")
     parser.add_argument("--dry-run", action="store_true")
@@ -241,6 +276,11 @@ def main() -> int:
     ensure_workspace_layout(workspace)
     sessions_dir = resolve_sessions_dir(args)
     transcript_dir = resolve_transcript_root(workspace, args.transcript_root)
+    if not is_under_root(transcript_dir, workspace) and not args.allow_external_transcript_root:
+        raise SystemExit(
+            "Refusing transcript root outside workspace. Keep transcripts under workspace/, "
+            "or pass --allow-external-transcript-root to override."
+        )
     memory_dir = (workspace / "memory").resolve()
     if is_under_root(transcript_dir, memory_dir) and not args.allow_transcripts_under_memory:
         raise SystemExit(
@@ -261,6 +301,7 @@ def main() -> int:
         sessions_dir=sessions_dir,
         transcript_dir=transcript_dir,
         retention_days=args.transcript_retention_days,
+        transcript_mode=args.transcript_mode,
         dry_run=args.dry_run,
     )
 
@@ -269,6 +310,7 @@ def main() -> int:
         f"semantic_deduped={deduped} "
         f"episodic_pruned={pruned} "
         f"transcript_root={transcript_dir} "
+        f"transcript_mode={args.transcript_mode} "
         f"transcripts_written={written} "
         f"transcripts_removed={removed} "
         f"legacy_migrated={migrated} "

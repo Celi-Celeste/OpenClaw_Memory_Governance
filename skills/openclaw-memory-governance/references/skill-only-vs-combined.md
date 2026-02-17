@@ -21,6 +21,7 @@ Works and remains useful. You still get:
 4. deterministic weekly identity promotion
 5. drift classify + soft forgetting
 6. confidence-gate response policy + executable gate script
+7. transcript privacy defaults (`sanitized` mode + lookup redaction)
 
 Missing in skill-only mode:
 
@@ -38,6 +39,7 @@ Works and improves runtime defaults, but lacks advanced governance:
 3. no weekly identity promotion
 4. no weekly drift revise/forget logic
 5. no confidence-gated transcript suggestion behavior
+6. no transcript privacy hardening controls from this skill
 
 ## Combined mode (recommended)
 

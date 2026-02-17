@@ -63,7 +63,12 @@ Run these scripts from `scripts/` with `--workspace <path>`:
 - Consolidate duplicate semantic entries.
 - Prune episodic files older than retention.
 - Build and rotate 7-day transcript mirror at `archive/transcripts`.
+- Default transcript mode is `sanitized`:
+  - redact likely secrets before write
+  - set transcript file permissions to `0600`
 - Refuse transcript roots under `memory/` unless explicitly overridden.
+- Refuse transcript roots outside workspace unless explicitly overridden.
+- Optional high-security mode: `--transcript-mode off` removes mirror files.
 
 3. `weekly_identity_promote.py`
 - Promote recurring semantic facts into identity files.
@@ -81,6 +86,8 @@ Run these scripts from `scripts/` with `--workspace <path>`:
 5. `transcript_lookup.py`
 - Return bounded transcript excerpts for user-approved lookups.
 - Never inject full transcript files.
+- Redact likely secrets in lookup output.
+- Ignore symlink transcript files.
 
 6. `confidence_gate.py`
 - Evaluate retrieval confidence before final answer.
@@ -132,7 +139,7 @@ Use smoke results to verify:
 
 1. identity -> semantic -> episodic retrieval ordering remains possible
 2. transcript mirror lives under `archive/transcripts`
-3. transcript lookup is bounded
+3. transcript lookup is bounded and redacted
 4. superseded memories are down-ranked to `historical`
 5. identity promotion writes to the correct destination files
 

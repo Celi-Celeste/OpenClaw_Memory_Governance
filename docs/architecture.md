@@ -31,7 +31,7 @@ flowchart TD
 1. Identity memory: stable user/project truths
 2. Semantic memory: distilled medium-term knowledge
 3. Episodic memory: short-horizon event memory
-4. Transcript mirror: 7-day precision archive for manual recall (`archive/transcripts/`)
+4. Transcript mirror: 7-day precision archive for manual recall (`archive/transcripts/`, default `sanitized` mode)
 
 Identity sub-files:
 

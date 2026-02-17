@@ -35,9 +35,15 @@ Example output (install with `crontab -e`):
 
 ```cron
 0 * * * * /usr/bin/env python3 /path/to/skill/scripts/hourly_semantic_extract.py --workspace /path/to/workspace >> /path/to/workspace/memory/logs/hourly.log 2>&1
-10 3 * * * /usr/bin/env python3 /path/to/skill/scripts/daily_consolidate.py --workspace /path/to/workspace --agent-id main --transcript-root archive/transcripts >> /path/to/workspace/memory/logs/daily.log 2>&1
+10 3 * * * /usr/bin/env python3 /path/to/skill/scripts/daily_consolidate.py --workspace /path/to/workspace --agent-id main --transcript-root archive/transcripts --transcript-mode sanitized >> /path/to/workspace/memory/logs/daily.log 2>&1
 10 4 * * 0 /usr/bin/env python3 /path/to/skill/scripts/weekly_identity_promote.py --workspace /path/to/workspace --window-days 30 --min-importance 0.85 --min-recurrence 3 >> /path/to/workspace/memory/logs/weekly-identity.log 2>&1
 20 4 * * 0 /usr/bin/env python3 /path/to/skill/scripts/weekly_drift_review.py --workspace /path/to/workspace --window-days 7 >> /path/to/workspace/memory/logs/weekly-drift.log 2>&1
+```
+
+Optional high-security daily line:
+
+```cron
+10 3 * * * /usr/bin/env python3 /path/to/skill/scripts/daily_consolidate.py --workspace /path/to/workspace --agent-id main --transcript-root archive/transcripts --transcript-mode off >> /path/to/workspace/memory/logs/daily.log 2>&1
 ```
 
 ## launchd Example (macOS)
