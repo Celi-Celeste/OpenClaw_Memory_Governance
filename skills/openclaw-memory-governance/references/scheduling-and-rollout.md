@@ -92,7 +92,9 @@ Then load:
 ```bash
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.hourly.plist
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.bootstrap.plist
+launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.importance.plist
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.daily.plist
+launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.session-hygiene.plist
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.weekly-identity.plist
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.weekly.plist
 ```
@@ -102,7 +104,9 @@ To unload:
 ```bash
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.hourly.plist
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.bootstrap.plist
+launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.importance.plist
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.daily.plist
+launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.session-hygiene.plist
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.weekly-identity.plist
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.weekly.plist
 ```

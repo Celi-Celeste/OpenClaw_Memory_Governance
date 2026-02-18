@@ -7,21 +7,25 @@ If cron/launchd entries are not installed, the memory governance system remains 
 
 Recommended activation command:
 
-`activate.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json"`
+`python3 activate.py --workspace "$HOME/.openclaw/workspace" --target-config "$HOME/.openclaw/openclaw.json"`
 
 If qmd is installed later, rerun:
 
-`activate.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json" --force-bootstrap`
+`python3 activate.py --workspace "$HOME/.openclaw/workspace" --target-config "$HOME/.openclaw/openclaw.json" --force-bootstrap`
 
-Activation runs `governance_doctor.py --mode quick` automatically.
+Activation runs `python3 governance_doctor.py --mode quick` automatically.
 
 Run full health audit:
 
-`governance_doctor.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json" --mode full`
+`python3 governance_doctor.py --workspace "$HOME/.openclaw/workspace" --target-config "$HOME/.openclaw/openclaw.json" --mode full`
 
 Apply safe self-heal fixes during audit:
 
-`governance_doctor.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json" --mode full --fix`
+`python3 governance_doctor.py --workspace "$HOME/.openclaw/workspace" --target-config "$HOME/.openclaw/openclaw.json" --mode full --fix`
+
+Commands below assume you are running from:
+
+`<repo-root>/skills/openclaw-memory-governance/scripts`
 
 ## Cadence Jobs
 
@@ -37,7 +41,7 @@ Apply safe self-heal fixes during audit:
 
 Use:
 
-`select_memory_profile.py --workspace "<workspace>" --target-config "~/.openclaw/openclaw.json" --apply`
+`python3 select_memory_profile.py --workspace "<workspace>" --target-config "$HOME/.openclaw/openclaw.json" --apply`
 
 Behavior:
 
@@ -48,7 +52,7 @@ Behavior:
 
 Bootstrap mode (recommended for routine rollout):
 
-`bootstrap_profile_once.py --workspace "<workspace>" --target-config "~/.openclaw/openclaw.json"`
+`python3 bootstrap_profile_once.py --workspace "<workspace>" --target-config "$HOME/.openclaw/openclaw.json"`
 
 1. First run applies backend selection and writes `memory/state/profile-bootstrap.json`
 2. Later runs exit quickly with `status=skipped` unless `--force` is provided
@@ -63,15 +67,15 @@ Default transcript mode:
 
 Daily command example:
 
-`daily_consolidate.py --workspace "<workspace>" --agent-id main --transcript-root archive/transcripts --transcript-mode sanitized`
+`python3 daily_consolidate.py --workspace "<workspace>" --agent-id main --transcript-root archive/transcripts --transcript-mode sanitized`
 
 Optional high-security mode:
 
-`daily_consolidate.py --workspace "<workspace>" --agent-id main --transcript-root archive/transcripts --transcript-mode off`
+`python3 daily_consolidate.py --workspace "<workspace>" --agent-id main --transcript-root archive/transcripts --transcript-mode off`
 
 Risky override acknowledgment:
 
-`daily_consolidate.py` requires `--acknowledge-transcript-risk` for:
+`python3 daily_consolidate.py` requires `--acknowledge-transcript-risk` for:
 1. `--transcript-mode full`
 2. `--allow-external-transcript-root`
 3. `--allow-transcripts-under-memory`
@@ -80,7 +84,7 @@ Risky override acknowledgment:
 
 Use:
 
-`transcript_lookup.py --transcript-root archive/transcripts --topic "<topic>" --last-n-days 7 --max-excerpts 5`
+`python3 transcript_lookup.py --transcript-root archive/transcripts --topic "<topic>" --last-n-days 7 --max-excerpts 5`
 
 Behavior:
 
@@ -93,14 +97,14 @@ Behavior:
 
 When retrieval confidence is weak:
 
-1. Run `confidence_gate.py` with retrieval metrics
+1. Run `python3 confidence_gate.py` with retrieval metrics
 2. Return `partial_and_ask_lookup` for low-confidence cases
 3. Ask user permission before transcript retrieval
 4. Avoid guessed specifics
 
 Executable flow command (recommended):
 
-`confidence_gate_flow.py --workspace "<workspace>" --avg-similarity <v> --result-count <n> --retrieval-confidence <v> --continuation-intent true|false --lookup-approved true|false --topic "<topic>"`
+`python3 confidence_gate_flow.py --workspace "<workspace>" --avg-similarity <v> --result-count <n> --retrieval-confidence <v> --continuation-intent true|false --lookup-approved true|false --topic "<topic>"`
 
 Flow behavior:
 
@@ -112,7 +116,7 @@ Flow behavior:
 
 Use:
 
-`ordered_recall.py --workspace "<workspace>" --topic "<topic>" --max-results 12 --max-per-layer 4`
+`python3 ordered_recall.py --workspace "<workspace>" --topic "<topic>" --max-results 12 --max-per-layer 4`
 
 Behavior:
 
@@ -125,7 +129,7 @@ Behavior:
 
 Use:
 
-`importance_score.py --workspace "<workspace>" --window-days 30 --max-updates 400`
+`python3 importance_score.py --workspace "<workspace>" --window-days 30 --max-updates 400`
 
 Behavior:
 
@@ -145,7 +149,7 @@ Alias file example:
 
 ## Identity Promotion Guardrail (Item 2)
 
-`weekly_identity_promote.py` now avoids over-promotion by requiring:
+`python3 weekly_identity_promote.py` now avoids over-promotion by requiring:
 
 1. recurrence and distinct-day spread
 2. minimum evidence age
@@ -169,7 +173,7 @@ After each OpenClaw update:
 
 Use:
 
-`session_hygiene.py --agent-id main --retention-days 30 --skip-recent-minutes 30`
+`python3 session_hygiene.py --agent-id main --retention-days 30 --skip-recent-minutes 30`
 
 Behavior:
 
