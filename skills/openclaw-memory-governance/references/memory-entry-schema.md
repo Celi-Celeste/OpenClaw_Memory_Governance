@@ -34,5 +34,7 @@ Concise memory statement.
 3. `scope` (`project|global|personal`)
 4. `durability` (`transient|project-stable|foundational`)
 5. `valid_until` (ISO timestamp or `none`)
+6. `last_scored_at` (ISO timestamp)
+7. `score_goal`, `score_recurrence`, `score_future`, `score_preference`, `score_novelty`
 
 Unknown metadata keys are preserved by scripts.

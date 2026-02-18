@@ -16,7 +16,7 @@ The core requirement is `SKILL.md`; the rest improves repeatability.
 Works and remains useful. You still get:
 
 1. layered memory schema discipline
-2. cadence scripts (hourly/daily/weekly)
+2. cadence scripts (hourly/daily/weekly, including bounded importance scoring)
 3. transcript mirror + bounded lookup
 4. deterministic weekly identity promotion
 5. drift classify + soft forgetting

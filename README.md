@@ -8,6 +8,7 @@ This project adds operational memory governance on top of OpenClaw:
 
 1. Layered memory workflow: `identity -> semantic -> episodic`
 2. Cadence jobs:
+   - Hourly importance scoring + tag/concept normalization
    - Hourly semantic extraction
    - Daily consolidation + transcript mirror rotation
    - Weekly identity promotion
@@ -159,3 +160,11 @@ Docs entrypoint:
 ## License
 
 This repository currently uses the MIT license (`LICENSE`).
+
+## Gems of War Team AI Starter
+
+A standalone starter for building a local Gems of War card database and generating synergy-based team recommendations now lives at:
+
+`gow_ai/README.md`
+
+It includes SQLite schema, JSON ingest, rule-based feature extraction, and baseline team recommendation scoring.

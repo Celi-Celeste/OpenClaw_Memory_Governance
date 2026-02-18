@@ -104,6 +104,81 @@ def main() -> int:
         sem_text = sem.read_text(encoding="utf-8")
         assert "Derived from mem:e1" in sem_text, "semantic promotion missing expected entry"
 
+        # Importance scoring should canonicalize tag aliases and cap per-run updates.
+        alias_dir = workspace / "memory" / "config"
+        alias_dir.mkdir(parents=True, exist_ok=True)
+        (alias_dir / "concept_aliases.json").write_text(
+            json.dumps(
+                {
+                    "governance thing": "openclaw memory governance",
+                    "the project": "openclaw memory governance",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        write_entries(
+            sem,
+            [
+                make_entry(
+                    "s1",
+                    "semantic",
+                    "Governance thing remains important for the project.",
+                    0.88,
+                    timestamp=(dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=8)).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                ),
+                make_entry(
+                    "s2",
+                    "semantic",
+                    "OpenClaw Memory Governance Skill is the baseline policy.",
+                    0.90,
+                    timestamp=(dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=9)).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                ),
+                make_entry(
+                    "s3",
+                    "semantic",
+                    "The project focus may shift after rollout.",
+                    0.75,
+                    timestamp=(dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=10)).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                ),
+            ],
+        )
+        # Explicitly set noisy tags to ensure canonicalization behavior.
+        sem_seed = sem.read_text(encoding="utf-8")
+        sem_seed = sem_seed.replace("tags: ['project']", "tags: ['governance thing', 'decision']", 1)
+        sem_seed = sem_seed.replace("tags: ['project']", "tags: ['OpenClaw Memory Governance Skill', 'policy']", 1)
+        sem_seed = sem_seed.replace("tags: ['project']", "tags: ['the project']", 1)
+        sem.write_text(sem_seed, encoding="utf-8")
+        score_run = run(
+            [
+                "python3",
+                str(script_dir / "importance_score.py"),
+                "--workspace",
+                str(workspace),
+                "--window-days",
+                "30",
+                "--max-updates",
+                "2",
+            ],
+            cwd=script_dir,
+        )
+        assert "updated=2" in score_run.stdout, "importance score max-updates cap not enforced"
+        scored_text = sem.read_text(encoding="utf-8")
+        assert "openclaw_memory_governance" in scored_text, "importance score failed to canonicalize alias tags"
+        assert scored_text.count("last_scored_at:") == 2, "importance score unexpectedly updated beyond cap"
+        score_path_guard = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "importance_score.py"),
+                "--workspace",
+                str(workspace),
+                "--checkpoint-file",
+                "../outside-checkpoint.json",
+            ],
+            cwd=script_dir,
+        )
+        assert score_path_guard.returncode != 0, "importance score should block checkpoint paths outside workspace"
+
         # Add contradictory semantic entries for drift review.
         old_ts = (
             dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=21)
@@ -164,6 +239,25 @@ def main() -> int:
             f"# {legacy_day.isoformat()}\n\n## 09:00:00 - user (legacy)\nlegacy transcript entry\n",
             encoding="utf-8",
         )
+        os.chmod(legacy_transcript, 0o644)
+        external_session_phrase = "this phrase must never be ingested from session symlink"
+        if hasattr(os, "symlink"):
+            outside_session_file = workspace.parent / "outside-session-event.jsonl"
+            outside_session_file.write_text(
+                json.dumps(
+                    {
+                        "timestamp": event_ts,
+                        "role": "user",
+                        "content": external_session_phrase,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            session_symlink = sessions_dir / "session-link.jsonl"
+            if session_symlink.exists() or session_symlink.is_symlink():
+                session_symlink.unlink()
+            os.symlink(outside_session_file, session_symlink)
 
         guard = run_maybe_fail(
             [
@@ -223,14 +317,20 @@ def main() -> int:
                 transcript = candidate
                 break
         assert transcript is not None, "daily transcript mirror missing expected session content"
-        assert (transcript_root / f"{legacy_day.isoformat()}.md").exists(), "legacy transcript was not migrated"
+        migrated_legacy = transcript_root / f"{legacy_day.isoformat()}.md"
+        assert migrated_legacy.exists(), "legacy transcript was not migrated"
         assert not legacy_transcript.exists(), "legacy transcript file was not moved"
         transcript_text = transcript.read_text(encoding="utf-8")
         assert "<REDACTED>" in transcript_text, "daily transcript mirror did not redact sensitive content"
         assert "sk-1234567890ABCDEFGHIJKLMNOP" not in transcript_text, "daily transcript mirror leaked raw API key"
         assert "internal_payload" not in transcript_text, "daily transcript mirror should skip non-text session payloads"
+        assert external_session_phrase not in transcript_text, "daily transcript mirror should skip session symlink inputs"
         mode = stat.S_IMODE(transcript.stat().st_mode)
         assert mode == 0o600, f"daily transcript mirror permissions should be 0600, got {oct(mode)}"
+        transcript_dir_mode = stat.S_IMODE(transcript_root.stat().st_mode)
+        assert transcript_dir_mode == 0o700, f"transcript mirror directory permissions should be 0700, got {oct(transcript_dir_mode)}"
+        migrated_mode = stat.S_IMODE(migrated_legacy.stat().st_mode)
+        assert migrated_mode == 0o600, f"migrated legacy transcript should be chmod 0600, got {oct(migrated_mode)}"
 
         lookup = run(
             [
@@ -416,6 +516,8 @@ def main() -> int:
                     "timestamp": event_ts,
                     "role": "user",
                     "content": "token=supersecretvalue and api_key=sk-ABCDEF1234567890ZXCV",
+                    "password": "plain-password-value",
+                    "metadata": {"api_key": "plain-structured-api-key"},
                 }
             )
             + "\n",
@@ -457,6 +559,8 @@ def main() -> int:
         assert not prune_file.exists(), "session hygiene failed to prune stale JSONL session file"
         stale_text = stale_file.read_text(encoding="utf-8")
         assert "supersecretvalue" not in stale_text, "session hygiene failed to redact token value"
+        assert "plain-password-value" not in stale_text, "session hygiene failed to redact structured password fields"
+        assert "plain-structured-api-key" not in stale_text, "session hygiene failed to redact nested structured API keys"
         assert "<REDACTED>" in stale_text, "session hygiene did not insert redaction markers"
         sessions_store_payload = json.loads(sessions_store.read_text(encoding="utf-8"))
         assert "drop" not in sessions_store_payload, "session hygiene failed to prune stale sessions.json entry"
@@ -486,16 +590,23 @@ def main() -> int:
 
         # Seed recurring semantic entries for identity promotion.
         sem_promote = workspace / "memory" / "semantic" / today.strftime("%Y-%m.md")
-        base_ts = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=3)
+        base_ts = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=12)
         promote_entries = []
         for idx in range(3):
-            ts = (base_ts + dt.timedelta(hours=idx)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            ts = (base_ts + dt.timedelta(days=idx)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
             promote_entries.append(make_entry(f"pref{idx}", "semantic", "User prefers concise status updates for memory review.", 0.92, timestamp=ts))
             promote_entries[-1]["meta"]["tags"] = "['preference']"
             promote_entries.append(make_entry(f"dec{idx}", "semantic", "Decision: keep OpenClaw memory governance skill-first and avoid core patching.", 0.94, timestamp=ts))
             promote_entries[-1]["meta"]["tags"] = "['decision']"
             promote_entries.append(make_entry(f"id{idx}", "semantic", "Core identity truth: project focus is reliable OpenClaw memory continuity.", 0.91, timestamp=ts))
+            promote_entries[-1]["meta"]["tags"] = "['identity']"
+            promote_entries.append(make_entry(f"tmp{idx}", "semantic", "Project burst topic this week only.", 0.96, timestamp=ts))
             promote_entries[-1]["meta"]["tags"] = "['project']"
+            promote_entries.append(make_entry(f"exp{idx}", "semantic", "Expired decision candidate should never be promoted.", 0.97, timestamp=ts))
+            promote_entries[-1]["meta"]["tags"] = "['decision']"
+            promote_entries[-1]["meta"]["valid_until"] = (
+                dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)
+            ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         write_entries(sem_promote, promote_entries)
 
         run(
@@ -519,6 +630,8 @@ def main() -> int:
         assert "Core identity truth" in identity_text, "identity promotion missing identity entry"
         assert "prefers concise status updates" in preferences_text, "identity promotion missing preferences entry"
         assert "Decision: keep OpenClaw memory governance skill-first" in decisions_text, "identity promotion missing decisions entry"
+        assert "Project burst topic this week only." not in identity_text, "identity promotion should skip transient project bursts"
+        assert "Expired decision candidate should never be promoted." not in decisions_text, "identity promotion should skip expired candidates"
 
         print("smoke_suite ok")
     return 0

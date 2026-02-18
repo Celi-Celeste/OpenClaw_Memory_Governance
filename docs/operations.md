@@ -3,10 +3,11 @@
 ## Cadence Jobs
 
 1. Hourly: `hourly_semantic_extract.py`
-2. Daily: `daily_consolidate.py`
-3. Weekly: `weekly_identity_promote.py`
-4. Weekly: `weekly_drift_review.py`
-5. Daily: `session_hygiene.py`
+2. Hourly: `importance_score.py`
+3. Daily: `daily_consolidate.py`
+4. Weekly: `weekly_identity_promote.py`
+5. Weekly: `weekly_drift_review.py`
+6. Daily: `session_hygiene.py`
 
 Default transcript mirror root:
 
@@ -55,6 +56,37 @@ Flow behavior:
 1. High confidence: returns `respond_normally`
 2. Low confidence + not approved: returns `partial_and_ask_lookup` with user prompt
 3. Low confidence + approved: performs bounded transcript lookup and returns excerpts
+
+## Importance Scoring (Items 1 + 5)
+
+Use:
+
+`importance_score.py --workspace "<workspace>" --window-days 30 --max-updates 400`
+
+Behavior:
+
+1. Applies 5-signal weighted scoring to episodic/semantic entries
+2. Canonicalizes noisy aliases via `memory/config/concept_aliases.json`
+3. Updates `importance` with smoothing (`alpha`) and durability-aware recency policy
+4. Caps per-run updates to avoid compute creep
+
+Alias file example:
+
+```json
+{
+  "governance thing": "openclaw memory governance",
+  "the project": "openclaw memory governance"
+}
+```
+
+## Identity Promotion Guardrail (Item 2)
+
+`weekly_identity_promote.py` now avoids over-promotion by requiring:
+
+1. recurrence and distinct-day spread
+2. minimum evidence age
+3. non-transient durability
+4. non-expired validity window
 
 ## Upgrade Checklist
 

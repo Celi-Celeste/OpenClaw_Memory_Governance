@@ -16,7 +16,7 @@ Use OpenClaw documented configuration only:
 Implement as scripts and prompts in this skill package:
 
 1. Layered entry schema enforcement
-2. Importance scoring and routing
+2. Importance scoring and routing (5-signal weighted + bounded updates)
 3. Hourly semantic extraction
 4. Daily consolidation and pruning
 5. Weekly identity promotion

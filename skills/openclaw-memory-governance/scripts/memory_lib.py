@@ -94,6 +94,11 @@ def ensure_workspace_layout(workspace: Path) -> None:
         DEFAULT_TRANSCRIPT_ROOT,
     ]:
         (workspace / sub).mkdir(parents=True, exist_ok=True)
+    transcript_dir = workspace / DEFAULT_TRANSCRIPT_ROOT
+    try:
+        os.chmod(transcript_dir, 0o700)
+    except OSError:
+        pass
 
 
 def episodic_file(workspace: Path, day: dt.date) -> Path:

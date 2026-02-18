@@ -52,6 +52,7 @@ def main() -> int:
     required_scripts = [
         "memory_lib.py",
         "hourly_semantic_extract.py",
+        "importance_score.py",
         "daily_consolidate.py",
         "confidence_gate.py",
         "confidence_gate_flow.py",

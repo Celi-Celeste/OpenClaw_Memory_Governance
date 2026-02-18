@@ -90,12 +90,63 @@ def _select_best_entry(entries: List[MemoryEntry]) -> MemoryEntry:
     return max(entries, key=sort_key)
 
 
+def _entry_time(entry: MemoryEntry) -> dt.datetime | None:
+    parsed = parse_iso_date(entry.meta.get("time", ""))
+    if parsed is None:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed
+
+
+def _infer_durability(tags: List[str], body: str, existing: str) -> str:
+    if existing in {"transient", "project-stable", "foundational"}:
+        return existing
+    lowered = {t.lower() for t in tags}
+    text = body.lower()
+    if lowered & {"identity", "principle", "foundational"} or "core identity" in text:
+        return "foundational"
+    if lowered & {"decision", "architecture", "policy", "constraint", "workflow", "preference"}:
+        return "project-stable"
+    return "transient"
+
+
+def _is_expired(entry: MemoryEntry, now: dt.datetime) -> bool:
+    raw = entry.meta.get("valid_until", "none").strip()
+    if not raw or raw.lower() == "none":
+        return False
+    parsed = parse_iso_date(raw)
+    if parsed is None:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed < now
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace", default=".", help="OpenClaw workspace root.")
     parser.add_argument("--window-days", type=int, default=30)
     parser.add_argument("--min-importance", type=float, default=0.85)
     parser.add_argument("--min-recurrence", type=int, default=3)
+    parser.add_argument(
+        "--min-distinct-days",
+        type=int,
+        default=2,
+        help="Require recurrence spread across at least this many distinct days.",
+    )
+    parser.add_argument(
+        "--min-age-days",
+        type=int,
+        default=7,
+        help="Require earliest supporting evidence to be at least this old before promotion.",
+    )
+    parser.add_argument(
+        "--max-groups",
+        type=int,
+        default=400,
+        help="Bound concept groups processed per run to avoid compute creep.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -120,12 +171,53 @@ def main() -> int:
         promoted_counts = {"identity": 0, "preferences": 0, "decisions": 0}
         skipped_duplicate = 0
         skipped_threshold = 0
+        skipped_durability = 0
+        skipped_recurrence_shape = 0
+        skipped_young = 0
+        skipped_expired = 0
 
-        for key, entries in grouped.items():
+        group_items = list(grouped.items())
+        group_items.sort(
+            key=lambda kv: (
+                -len(kv[1]),
+                -max(e.get_float("importance", 0.0) for e in kv[1]),
+            )
+        )
+        if args.max_groups >= 0:
+            group_items = group_items[: args.max_groups]
+
+        now = dt.datetime.now(dt.timezone.utc)
+
+        for key, entries in group_items:
             recurrence = len(entries)
             best = _select_best_entry(entries)
             if recurrence < args.min_recurrence or best.get_float("importance", 0.0) < args.min_importance:
                 skipped_threshold += 1
+                continue
+
+            distinct_days = {
+                ts.date()
+                for ts in (_entry_time(entry) for entry in entries)
+                if ts is not None
+            }
+            if len(distinct_days) < args.min_distinct_days:
+                skipped_recurrence_shape += 1
+                continue
+
+            timestamps = [ts for ts in (_entry_time(entry) for entry in entries) if ts is not None]
+            if timestamps:
+                earliest = min(timestamps)
+                if (now - earliest) < dt.timedelta(days=max(args.min_age_days, 0)):
+                    skipped_young += 1
+                    continue
+
+            if _is_expired(best, now):
+                skipped_expired += 1
+                continue
+
+            durability = _infer_durability(best.tags(), best.body, best.meta.get("durability", "").strip().lower())
+            if durability == "transient":
+                skipped_durability += 1
                 continue
 
             best_origin_id = best.meta.get("origin_id", "").strip() or best.entry_id
@@ -149,6 +241,9 @@ def main() -> int:
                         "supersedes": "none",
                         "origin_id": best_origin_id,
                         "recurrence": str(recurrence),
+                        "scope": best.meta.get("scope", "project"),
+                        "durability": durability,
+                        "valid_until": best.meta.get("valid_until", "none"),
                     },
                     body=best.body,
                 )
@@ -167,7 +262,11 @@ def main() -> int:
             f"promoted_preferences={promoted_counts['preferences']} "
             f"promoted_decisions={promoted_counts['decisions']} "
             f"skipped_threshold={skipped_threshold} "
-            f"skipped_duplicate={skipped_duplicate}"
+            f"skipped_duplicate={skipped_duplicate} "
+            f"skipped_durability={skipped_durability} "
+            f"skipped_recurrence_shape={skipped_recurrence_shape} "
+            f"skipped_young={skipped_young} "
+            f"skipped_expired={skipped_expired}"
         )
         return 0
 

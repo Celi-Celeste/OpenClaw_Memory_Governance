@@ -55,11 +55,21 @@ supersedes: mem:<uuid>|none
 
 Run these scripts from `scripts/` with `--workspace <path>`:
 
-1. `hourly_semantic_extract.py`
+1. `importance_score.py`
+- Re-score episodic/semantic memories using 5 signals:
+  - goal relevance
+  - recurrence
+  - future utility
+  - preference signal
+  - novelty
+- Canonicalize noisy concept/tag aliases from `memory/config/concept_aliases.json`.
+- Bound per-run workload with `--max-updates` to avoid compute creep.
+
+2. `hourly_semantic_extract.py`
 - Promote episodic entries with `importance >= 0.60` into semantic candidates.
 - Do not modify OpenClaw indexes directly.
 
-2. `daily_consolidate.py`
+3. `daily_consolidate.py`
 - Consolidate duplicate semantic entries.
 - Prune episodic files older than retention.
 - Build and rotate 7-day transcript mirror at `archive/transcripts`.
@@ -70,41 +80,46 @@ Run these scripts from `scripts/` with `--workspace <path>`:
 - Refuse transcript roots outside workspace unless explicitly overridden.
 - Optional high-security mode: `--transcript-mode off` removes mirror files.
 
-3. `weekly_identity_promote.py`
+4. `weekly_identity_promote.py`
 - Promote recurring semantic facts into identity files.
 - Route using fixed taxonomy:
   - `preferences.md` for preference/style tags
   - `decisions.md` for decision/policy tags
   - `identity.md` for all other durable truths
 - Default thresholds: `importance >= 0.85` and `recurrence >= 3` in 30 days.
+- Guard against over-promotion:
+  - require recurrence across multiple days
+  - require minimum evidence age
+  - skip transient/expired memories
+  - bound processed groups with `--max-groups`
 
-4. `weekly_drift_review.py`
+5. `weekly_drift_review.py`
 - Classify new-vs-existing semantic memories as `REINFORCES`, `REFINES`, `SUPERSEDES`, `UNRELATED`.
 - Mark superseded entries `historical` without deletion.
 - Append actions to `memory/drift-log.md`.
 
-5. `transcript_lookup.py`
+6. `transcript_lookup.py`
 - Return bounded transcript excerpts for user-approved lookups.
 - Never inject full transcript files.
 - Redact likely secrets in lookup output.
 - Ignore symlink transcript files.
 
-6. `confidence_gate.py`
+7. `confidence_gate.py`
 - Evaluate retrieval confidence before final answer.
 - Return JSON action:
   - `respond_normally`
   - `partial_and_ask_lookup`
 
-7. `confidence_gate_flow.py`
+8. `confidence_gate_flow.py`
 - Execute confidence gate + lookup decision path in one step.
 - If confidence is weak and lookup is not approved, returns ask-lookup action.
 - If lookup is approved, performs bounded `transcript_lookup` and returns excerpts.
 
-8. `render_schedule.py`
+9. `render_schedule.py`
 - Print crontab entries and optionally generate launchd plists.
 - Use this to install routine hourly/daily/weekly cadence jobs.
 
-9. `session_hygiene.py`
+10. `session_hygiene.py`
 - Harden OpenClaw session storage (`~/.openclaw/agents/<id>/sessions` by default).
 - Apply permissions (`0700` dir, `0600` files).
 - Redact likely secrets in stale JSONL transcript lines.

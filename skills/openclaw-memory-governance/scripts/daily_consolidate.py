@@ -135,9 +135,20 @@ def _iter_session_events(
     since_date: dt.date,
     transcript_mode: str,
 ) -> Iterable[Tuple[dt.datetime, str, str, str]]:
+    sessions_root = sessions_dir.resolve()
     for jsonl in sorted(sessions_dir.glob("*.jsonl")):
-        fallback_ts = dt.datetime.fromtimestamp(jsonl.stat().st_mtime, tz=dt.timezone.utc)
-        with jsonl.open("r", encoding="utf-8") as fh:
+        if jsonl.is_symlink():
+            continue
+        try:
+            resolved_jsonl = jsonl.resolve(strict=True)
+        except OSError:
+            continue
+        if not resolved_jsonl.is_file():
+            continue
+        if not is_under_root(resolved_jsonl, sessions_root):
+            continue
+        fallback_ts = dt.datetime.fromtimestamp(resolved_jsonl.stat().st_mtime, tz=dt.timezone.utc)
+        with resolved_jsonl.open("r", encoding="utf-8") as fh:
             for raw in fh:
                 raw = raw.strip()
                 if not raw:
@@ -182,6 +193,10 @@ def build_transcript_mirror(
         return 0, removed
 
     transcript_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(transcript_dir, 0o700)
+    except OSError:
+        pass
     written = 0
     if sessions_dir and sessions_dir.exists():
         by_day: Dict[dt.date, List[Tuple[dt.datetime, str, str, str]]] = defaultdict(list)
@@ -231,7 +246,12 @@ def migrate_legacy_transcripts(workspace: Path, transcript_dir: Path, dry_run: b
     for legacy_file in legacy_files:
         migrated += 1
         if not dry_run:
-            shutil.move(str(legacy_file), str(transcript_dir / legacy_file.name))
+            target = transcript_dir / legacy_file.name
+            shutil.move(str(legacy_file), str(target))
+            try:
+                os.chmod(target, 0o600)
+            except OSError:
+                pass
     return migrated, 0
 
 

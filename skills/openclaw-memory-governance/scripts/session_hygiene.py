@@ -7,10 +7,15 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
 from memory_lib import atomic_write_text, file_lock, redact_secrets
+
+SENSITIVE_KEY_RE = re.compile(
+    r"(?i)(api[_-]?key|access[_-]?token|token|secret|password|passphrase|private[_-]?key|bearer)"
+)
 
 
 def resolve_sessions_dir(args: argparse.Namespace) -> Path:
@@ -31,15 +36,22 @@ def apply_permissions(path: Path, mode: int, dry_run: bool) -> bool:
         return False
 
 
-def _redact_value(value: Any) -> Tuple[Any, bool]:
+def _is_sensitive_key(key: str) -> bool:
+    return bool(SENSITIVE_KEY_RE.search(key.strip()))
+
+
+def _redact_value(value: Any, key_hint: str = "") -> Tuple[Any, bool]:
     if isinstance(value, str):
+        if _is_sensitive_key(key_hint) and value.strip():
+            redacted = "<REDACTED>"
+            return redacted, redacted != value
         redacted = redact_secrets(value)
         return redacted, redacted != value
     if isinstance(value, list):
         changed = False
         updated = []
         for item in value:
-            new_item, item_changed = _redact_value(item)
+            new_item, item_changed = _redact_value(item, key_hint=key_hint)
             updated.append(new_item)
             changed = changed or item_changed
         return updated, changed
@@ -47,7 +59,7 @@ def _redact_value(value: Any) -> Tuple[Any, bool]:
         changed = False
         updated: Dict[str, Any] = {}
         for k, v in value.items():
-            new_v, v_changed = _redact_value(v)
+            new_v, v_changed = _redact_value(v, key_hint=str(k))
             updated[k] = new_v
             changed = changed or v_changed
         return updated, changed

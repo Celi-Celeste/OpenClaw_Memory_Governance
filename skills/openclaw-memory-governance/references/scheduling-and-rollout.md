@@ -6,11 +6,12 @@ This skill package supports routine cadence jobs without modifying OpenClaw core
 
 Cadence jobs:
 
-1. Hourly: semantic extraction
-2. Daily: consolidation + transcript mirror rotation
-3. Daily: session hygiene for OpenClaw JSONL logs
-4. Weekly: identity promotion
-5. Weekly: drift review + soft forgetting
+1. Hourly: importance scoring + concept normalization
+2. Hourly: semantic extraction
+3. Daily: consolidation + transcript mirror rotation
+4. Daily: session hygiene for OpenClaw JSONL logs
+5. Weekly: identity promotion
+6. Weekly: drift review + soft forgetting
 
 ## Heartbeat Policy
 
@@ -40,6 +41,7 @@ python3 scripts/render_schedule.py --workspace /path/to/workspace --agent-id mai
 Example output (install with `crontab -e`):
 
 ```cron
+5 * * * * /usr/bin/env python3 /path/to/skill/scripts/importance_score.py --workspace /path/to/workspace --window-days 30 --max-updates 400 >> /path/to/workspace/memory/logs/importance.log 2>&1
 0 * * * * /usr/bin/env python3 /path/to/skill/scripts/hourly_semantic_extract.py --workspace /path/to/workspace >> /path/to/workspace/memory/logs/hourly.log 2>&1
 10 3 * * * /usr/bin/env python3 /path/to/skill/scripts/daily_consolidate.py --workspace /path/to/workspace --agent-id main --transcript-root archive/transcripts --transcript-mode sanitized >> /path/to/workspace/memory/logs/daily.log 2>&1
 40 3 * * * /usr/bin/env python3 /path/to/skill/scripts/session_hygiene.py --agent-id main --retention-days 30 --skip-recent-minutes 30 >> /path/to/workspace/memory/logs/session-hygiene.log 2>&1

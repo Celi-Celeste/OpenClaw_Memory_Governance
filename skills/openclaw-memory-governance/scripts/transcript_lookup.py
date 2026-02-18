@@ -59,6 +59,10 @@ def lookup_transcripts(
             "or pass --allow-external-transcript-root to override."
         )
     transcript_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        transcript_dir.chmod(0o700)
+    except OSError:
+        pass
 
     topic_tokens = set(tokenize(topic))
     cutoff = dt.date.today() - dt.timedelta(days=max(last_n_days - 1, 0))

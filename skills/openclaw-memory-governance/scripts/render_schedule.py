@@ -13,6 +13,7 @@ def cron_lines(workspace: Path, scripts_dir: Path, agent_id: str) -> list[str]:
     logs = workspace / "memory" / "logs"
     q = shlex.quote
     lines = [
+        f"5 * * * * /usr/bin/env python3 {q(str(scripts_dir / 'importance_score.py'))} --workspace {q(str(workspace))} --window-days 30 --max-updates 400 >> {q(str(logs / 'importance.log'))} 2>&1",
         f"0 * * * * /usr/bin/env python3 {q(str(scripts_dir / 'hourly_semantic_extract.py'))} --workspace {q(str(workspace))} >> {q(str(logs / 'hourly.log'))} 2>&1",
         (
             "10 3 * * * /usr/bin/env python3 "
@@ -96,6 +97,16 @@ def main() -> int:
 
     if args.launchd_dir:
         out = Path(args.launchd_dir).expanduser().resolve()
+        write_launchd_plist(
+            out / "com.openclaw.memory.importance.plist",
+            "com.openclaw.memory.importance",
+            scripts_dir / "importance_score.py",
+            workspace,
+            logs_dir,
+            hour=0,
+            minute=5,
+            extra_args=["--window-days", "30", "--max-updates", "400"],
+        )
         write_launchd_plist(
             out / "com.openclaw.memory.hourly.plist",
             "com.openclaw.memory.hourly",
