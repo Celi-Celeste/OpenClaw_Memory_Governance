@@ -22,6 +22,7 @@ Works and remains useful. You still get:
 5. drift classify + soft forgetting
 6. confidence-gate response policy + executable gate script
 7. transcript privacy defaults (`sanitized` mode + lookup redaction)
+8. session JSONL hygiene (`session_hygiene.py`)
 
 Missing in skill-only mode:
 
@@ -40,6 +41,7 @@ Works and improves runtime defaults, but lacks advanced governance:
 4. no weekly drift revise/forget logic
 5. no confidence-gated transcript suggestion behavior
 6. no transcript privacy hardening controls from this skill
+7. no session JSONL hygiene controls from this skill
 
 ## Combined mode (recommended)
 

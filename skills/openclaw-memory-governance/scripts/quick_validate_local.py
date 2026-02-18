@@ -54,9 +54,11 @@ def main() -> int:
         "hourly_semantic_extract.py",
         "daily_consolidate.py",
         "confidence_gate.py",
+        "confidence_gate_flow.py",
         "weekly_identity_promote.py",
         "weekly_drift_review.py",
         "transcript_lookup.py",
+        "session_hygiene.py",
         "render_schedule.py",
         "smoke_suite.py",
     ]

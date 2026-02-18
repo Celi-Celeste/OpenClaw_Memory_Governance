@@ -95,9 +95,20 @@ Run these scripts from `scripts/` with `--workspace <path>`:
   - `respond_normally`
   - `partial_and_ask_lookup`
 
-7. `render_schedule.py`
+7. `confidence_gate_flow.py`
+- Execute confidence gate + lookup decision path in one step.
+- If confidence is weak and lookup is not approved, returns ask-lookup action.
+- If lookup is approved, performs bounded `transcript_lookup` and returns excerpts.
+
+8. `render_schedule.py`
 - Print crontab entries and optionally generate launchd plists.
 - Use this to install routine hourly/daily/weekly cadence jobs.
+
+9. `session_hygiene.py`
+- Harden OpenClaw session storage (`~/.openclaw/agents/<id>/sessions` by default).
+- Apply permissions (`0700` dir, `0600` files).
+- Redact likely secrets in stale JSONL transcript lines.
+- Prune old JSONL files by retention window and clean stale `sessions.json` entries.
 
 ## Confidence Gate Behavior
 
@@ -111,6 +122,10 @@ Use thresholds:
 
 When low confidence is detected, ask permission:
 "I may be missing specifics. Want me to check transcripts for the last 7 days?"
+
+Executable flow command:
+
+`confidence_gate_flow.py --workspace "<workspace>" --avg-similarity <v> --result-count <n> --retrieval-confidence <v> --continuation-intent true|false --lookup-approved true|false --topic "<topic>"`
 
 Identity recall priority within identity layer:
 

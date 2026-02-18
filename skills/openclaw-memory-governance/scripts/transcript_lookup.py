@@ -42,6 +42,61 @@ def parse_transcript_sections(path: Path) -> List[Dict]:
     return sections
 
 
+def lookup_transcripts(
+    workspace: Path,
+    transcript_root: str,
+    topic: str,
+    last_n_days: int = 7,
+    max_excerpts: int = 5,
+    max_chars_per_excerpt: int = 1200,
+    allow_external_transcript_root: bool = False,
+) -> Dict[str, object]:
+    ensure_workspace_layout(workspace)
+    transcript_dir = resolve_transcript_root(workspace, transcript_root)
+    if not is_under_root(transcript_dir, workspace) and not allow_external_transcript_root:
+        raise SystemExit(
+            "Refusing transcript root outside workspace. Keep transcripts under workspace/, "
+            "or pass --allow-external-transcript-root to override."
+        )
+    transcript_dir.mkdir(parents=True, exist_ok=True)
+
+    topic_tokens = set(tokenize(topic))
+    cutoff = dt.date.today() - dt.timedelta(days=max(last_n_days - 1, 0))
+    results: List[Dict] = []
+
+    for path in sorted(transcript_dir.glob("*.md")):
+        if path.is_symlink():
+            continue
+        resolved = path.resolve()
+        if not is_under_root(resolved, transcript_dir):
+            continue
+        day = parse_date_from_filename(path.name)
+        if not day or day < cutoff:
+            continue
+        for sec in parse_transcript_sections(resolved):
+            haystack = f"{sec['header']} {sec['body']}".lower()
+            if not haystack.strip():
+                continue
+            score = sum(1 for tok in topic_tokens if tok in haystack)
+            if score <= 0:
+                continue
+            excerpt = redact_secrets(sec["body"].strip())
+            if len(excerpt) > max_chars_per_excerpt:
+                excerpt = excerpt[: max_chars_per_excerpt - 3].rstrip() + "..."
+            results.append(
+                {
+                    "date": day.isoformat(),
+                    "header": redact_secrets(sec["header"]),
+                    "score": score,
+                    "excerpt": excerpt,
+                    "source_ref": str(resolved.relative_to(workspace)),
+                }
+            )
+
+    results.sort(key=lambda x: (x["score"], x["date"]), reverse=True)
+    return {"topic": topic, "results": results[:max_excerpts]}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace", default=".", help="OpenClaw workspace root.")
@@ -62,50 +117,15 @@ def main() -> int:
     args = parser.parse_args()
 
     workspace = Path(args.workspace).resolve()
-    ensure_workspace_layout(workspace)
-    transcript_dir = resolve_transcript_root(workspace, args.transcript_root)
-    if not is_under_root(transcript_dir, workspace) and not args.allow_external_transcript_root:
-        raise SystemExit(
-            "Refusing transcript root outside workspace. Keep transcripts under workspace/, "
-            "or pass --allow-external-transcript-root to override."
-        )
-    transcript_dir.mkdir(parents=True, exist_ok=True)
-
-    topic_tokens = set(tokenize(args.topic))
-    cutoff = dt.date.today() - dt.timedelta(days=max(args.last_n_days - 1, 0))
-    results: List[Dict] = []
-
-    for path in sorted(transcript_dir.glob("*.md")):
-        if path.is_symlink():
-            continue
-        resolved = path.resolve()
-        if not is_under_root(resolved, transcript_dir):
-            continue
-        day = parse_date_from_filename(path.name)
-        if not day or day < cutoff:
-            continue
-        for sec in parse_transcript_sections(resolved):
-            haystack = f"{sec['header']} {sec['body']}".lower()
-            if not haystack.strip():
-                continue
-            score = sum(1 for tok in topic_tokens if tok in haystack)
-            if score <= 0:
-                continue
-            excerpt = redact_secrets(sec["body"].strip())
-            if len(excerpt) > args.max_chars_per_excerpt:
-                excerpt = excerpt[: args.max_chars_per_excerpt - 3].rstrip() + "..."
-            results.append(
-                {
-                    "date": day.isoformat(),
-                    "header": redact_secrets(sec["header"]),
-                    "score": score,
-                    "excerpt": excerpt,
-                    "source_ref": str(resolved.relative_to(workspace)),
-                }
-            )
-
-    results.sort(key=lambda x: (x["score"], x["date"]), reverse=True)
-    payload = {"topic": args.topic, "results": results[: args.max_excerpts]}
+    payload = lookup_transcripts(
+        workspace=workspace,
+        transcript_root=args.transcript_root,
+        topic=args.topic,
+        last_n_days=args.last_n_days,
+        max_excerpts=args.max_excerpts,
+        max_chars_per_excerpt=args.max_chars_per_excerpt,
+        allow_external_transcript_root=args.allow_external_transcript_root,
+    )
     print(json.dumps(payload, indent=2))
     return 0
 

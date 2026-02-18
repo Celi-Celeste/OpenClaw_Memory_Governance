@@ -40,7 +40,8 @@ Notes:
 
 1. Transcript mirror defaults to `archive/transcripts/` (outside `memory/`).
 2. Transcript mirror defaults to `--transcript-mode sanitized` (secret redaction + `0600` file permissions).
-3. Weekly cadence now includes identity promotion before drift review.
+3. Session hygiene defaults are included in generated schedules (`session_hygiene.py`).
+4. Weekly cadence now includes identity promotion before drift review.
 
 Optional high-security mode:
 

@@ -25,6 +25,8 @@ Implement as scripts and prompts in this skill package:
 8. On-demand transcript lookup tool behavior
 9. Confidence-gated recall suggestions
 10. Transcript privacy controls (`--transcript-mode sanitized|full|off`, lookup redaction)
+11. Executable confidence gate flow (`confidence_gate_flow.py`)
+12. Session hygiene controls (`session_hygiene.py` retention + redaction + permissions)
 
 ## Hard boundary
 

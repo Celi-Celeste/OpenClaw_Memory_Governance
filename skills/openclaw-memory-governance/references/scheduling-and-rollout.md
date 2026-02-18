@@ -8,8 +8,9 @@ Cadence jobs:
 
 1. Hourly: semantic extraction
 2. Daily: consolidation + transcript mirror rotation
-3. Weekly: identity promotion
-4. Weekly: drift review + soft forgetting
+3. Daily: session hygiene for OpenClaw JSONL logs
+4. Weekly: identity promotion
+5. Weekly: drift review + soft forgetting
 
 ## Heartbeat Policy
 
@@ -36,6 +37,7 @@ Example output (install with `crontab -e`):
 ```cron
 0 * * * * /usr/bin/env python3 /path/to/skill/scripts/hourly_semantic_extract.py --workspace /path/to/workspace >> /path/to/workspace/memory/logs/hourly.log 2>&1
 10 3 * * * /usr/bin/env python3 /path/to/skill/scripts/daily_consolidate.py --workspace /path/to/workspace --agent-id main --transcript-root archive/transcripts --transcript-mode sanitized >> /path/to/workspace/memory/logs/daily.log 2>&1
+40 3 * * * /usr/bin/env python3 /path/to/skill/scripts/session_hygiene.py --agent-id main --retention-days 30 --skip-recent-minutes 30 >> /path/to/workspace/memory/logs/session-hygiene.log 2>&1
 10 4 * * 0 /usr/bin/env python3 /path/to/skill/scripts/weekly_identity_promote.py --workspace /path/to/workspace --window-days 30 --min-importance 0.85 --min-recurrence 3 >> /path/to/workspace/memory/logs/weekly-identity.log 2>&1
 20 4 * * 0 /usr/bin/env python3 /path/to/skill/scripts/weekly_drift_review.py --workspace /path/to/workspace --window-days 7 >> /path/to/workspace/memory/logs/weekly-drift.log 2>&1
 ```

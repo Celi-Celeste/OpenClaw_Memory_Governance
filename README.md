@@ -14,10 +14,15 @@ This project adds operational memory governance on top of OpenClaw:
    - Weekly drift review with soft supersede (`historical` status)
 3. On-demand transcript recall (bounded excerpts, not full transcript dumps)
 4. Confidence-gated behavior for weak recall scenarios
+   - includes executable `confidence_gate_flow.py` for gate + approval + lookup path
 5. Transcript privacy hardening:
    - default sanitized mirror mode (secret redaction)
    - restrictive transcript file permissions (`0600`)
    - safe transcript lookup (symlink ignore + bounded output redaction)
+6. Session log hygiene for upstream session JSONL risk:
+   - permission hardening (`0700` dir, `0600` files)
+   - stale-log retention pruning
+   - secret redaction for non-recent logs
 
 ## Why This Is Upgrade-Safe
 

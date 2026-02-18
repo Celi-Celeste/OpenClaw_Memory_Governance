@@ -37,6 +37,14 @@ def cron_lines(workspace: Path, scripts_dir: Path, agent_id: str) -> list[str]:
             "--window-days 7 "
             f">> {q(str(logs / 'weekly-drift.log'))} 2>&1"
         ),
+        (
+            "40 3 * * * /usr/bin/env python3 "
+            f"{q(str(scripts_dir / 'session_hygiene.py'))} "
+            f"--agent-id {q(agent_id)} "
+            "--retention-days 30 "
+            "--skip-recent-minutes 30 "
+            f">> {q(str(logs / 'session-hygiene.log'))} 2>&1"
+        ),
     ]
     return lines
 
@@ -134,6 +142,16 @@ def main() -> int:
             hour=4,
             minute=20,
             weekday=0,
+        )
+        write_launchd_plist(
+            out / "com.openclaw.memory.session-hygiene.plist",
+            "com.openclaw.memory.session-hygiene",
+            scripts_dir / "session_hygiene.py",
+            workspace,
+            logs_dir,
+            hour=3,
+            minute=40,
+            extra_args=["--agent-id", args.agent_id, "--retention-days", "30", "--skip-recent-minutes", "30"],
         )
         print(f"# launchd plists generated in {out}")
 

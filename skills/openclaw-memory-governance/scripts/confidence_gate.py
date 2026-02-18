@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from typing import Dict, List
 
 
 def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -20,33 +21,27 @@ def parse_bool(value: str) -> bool:
     raise argparse.ArgumentTypeError("Expected true|false")
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--avg-similarity", type=float, required=True)
-    parser.add_argument("--result-count", type=int, required=True)
-    parser.add_argument("--retrieval-confidence", type=float, default=-1.0)
-    parser.add_argument("--continuation-intent", type=parse_bool, required=True)
-    parser.add_argument("--min-similarity", type=float, default=0.72)
-    parser.add_argument("--min-results", type=int, default=5)
-    parser.add_argument("--min-confidence", type=float, default=0.65)
-    args = parser.parse_args()
-
-    avg_similarity = clamp(args.avg_similarity)
-    result_count = max(args.result_count, 0)
-    retrieval_confidence = (
-        avg_similarity
-        if args.retrieval_confidence < 0
-        else clamp(args.retrieval_confidence)
-    )
-    result_strength = clamp(result_count / max(args.min_results, 1))
+def evaluate_confidence_gate(
+    avg_similarity: float,
+    result_count: int,
+    retrieval_confidence: float,
+    continuation_intent: bool,
+    min_similarity: float = 0.72,
+    min_results: int = 5,
+    min_confidence: float = 0.65,
+) -> Dict[str, object]:
+    avg_similarity = clamp(avg_similarity)
+    result_count = max(result_count, 0)
+    retrieval_confidence = avg_similarity if retrieval_confidence < 0 else clamp(retrieval_confidence)
+    result_strength = clamp(result_count / max(min_results, 1))
     confidence_score = clamp((retrieval_confidence * 0.7) + (result_strength * 0.3))
 
-    trigger_reasons = []
-    if avg_similarity < args.min_similarity:
+    trigger_reasons: List[str] = []
+    if avg_similarity < min_similarity:
         trigger_reasons.append("weak_similarity")
-    if result_count < args.min_results:
+    if result_count < min_results:
         trigger_reasons.append("sparse_results")
-    if args.continuation_intent and confidence_score < args.min_confidence:
+    if continuation_intent and confidence_score < min_confidence:
         trigger_reasons.append("continuation_gap")
 
     action = "respond_normally"
@@ -58,12 +53,34 @@ def main() -> int:
             "Do you want me to check transcript archives for specific details?"
         )
 
-    payload = {
+    return {
         "action": action,
         "confidence_score": round(confidence_score, 4),
         "trigger_reasons": trigger_reasons,
         "suggested_prompt": suggested_prompt,
     }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--avg-similarity", type=float, required=True)
+    parser.add_argument("--result-count", type=int, required=True)
+    parser.add_argument("--retrieval-confidence", type=float, default=-1.0)
+    parser.add_argument("--continuation-intent", type=parse_bool, required=True)
+    parser.add_argument("--min-similarity", type=float, default=0.72)
+    parser.add_argument("--min-results", type=int, default=5)
+    parser.add_argument("--min-confidence", type=float, default=0.65)
+    args = parser.parse_args()
+
+    payload = evaluate_confidence_gate(
+        avg_similarity=args.avg_similarity,
+        result_count=args.result_count,
+        retrieval_confidence=args.retrieval_confidence,
+        continuation_intent=args.continuation_intent,
+        min_similarity=args.min_similarity,
+        min_results=args.min_results,
+        min_confidence=args.min_confidence,
+    )
     print(json.dumps(payload, indent=2))
     return 0
 

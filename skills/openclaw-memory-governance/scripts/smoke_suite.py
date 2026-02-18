@@ -291,21 +291,6 @@ def main() -> int:
         )
         assert lookup_external_guard.returncode != 0, "transcript lookup root guard failed to block external path"
 
-        run(
-            [
-                "python3",
-                str(script_dir / "daily_consolidate.py"),
-                "--workspace",
-                str(workspace),
-                "--transcript-root",
-                "archive/transcripts",
-                "--transcript-mode",
-                "off",
-            ],
-            cwd=script_dir,
-        )
-        assert not list(transcript_root.glob("*.md")), "transcript-mode off should remove transcript mirror files"
-
         low_conf = run(
             [
                 "python3",
@@ -341,6 +326,156 @@ def main() -> int:
         )
         high_payload = json.loads(high_conf.stdout)
         assert high_payload["action"] == "respond_normally", "confidence gate high-signal action mismatch"
+
+        flow_hold = run(
+            [
+                "python3",
+                str(script_dir / "confidence_gate_flow.py"),
+                "--workspace",
+                str(workspace),
+                "--avg-similarity",
+                "0.55",
+                "--result-count",
+                "2",
+                "--retrieval-confidence",
+                "0.58",
+                "--continuation-intent",
+                "true",
+                "--lookup-approved",
+                "false",
+            ],
+            cwd=script_dir,
+        )
+        flow_hold_payload = json.loads(flow_hold.stdout)
+        assert flow_hold_payload["decision"] == "partial_and_ask_lookup", "confidence flow should request lookup before approval"
+        assert not flow_hold_payload["lookup_performed"], "confidence flow should not perform lookup without approval"
+
+        flow_lookup = run(
+            [
+                "python3",
+                str(script_dir / "confidence_gate_flow.py"),
+                "--workspace",
+                str(workspace),
+                "--avg-similarity",
+                "0.55",
+                "--result-count",
+                "2",
+                "--retrieval-confidence",
+                "0.58",
+                "--continuation-intent",
+                "true",
+                "--lookup-approved",
+                "true",
+                "--topic",
+                "memory cadence",
+            ],
+            cwd=script_dir,
+        )
+        flow_lookup_payload = json.loads(flow_lookup.stdout)
+        assert flow_lookup_payload["decision"] == "lookup_performed", "confidence flow should perform lookup after approval"
+        assert flow_lookup_payload["lookup_performed"], "confidence flow lookup flag mismatch"
+        assert flow_lookup_payload["lookup"]["results"], "confidence flow lookup returned no excerpts"
+
+        flow_normal = run(
+            [
+                "python3",
+                str(script_dir / "confidence_gate_flow.py"),
+                "--workspace",
+                str(workspace),
+                "--avg-similarity",
+                "0.89",
+                "--result-count",
+                "10",
+                "--retrieval-confidence",
+                "0.86",
+                "--continuation-intent",
+                "false",
+                "--lookup-approved",
+                "true",
+                "--topic",
+                "memory cadence",
+            ],
+            cwd=script_dir,
+        )
+        flow_normal_payload = json.loads(flow_normal.stdout)
+        assert flow_normal_payload["decision"] == "respond_normally", "confidence flow should respond normally for high signal"
+        assert not flow_normal_payload["lookup_performed"], "confidence flow should skip lookup when confidence is high"
+
+        # Validate session hygiene controls for upstream session JSONL risk.
+        stale_file = sessions_dir / "stale-session.jsonl"
+        stale_file.write_text(
+            json.dumps(
+                {
+                    "timestamp": event_ts,
+                    "role": "user",
+                    "content": "token=supersecretvalue and api_key=sk-ABCDEF1234567890ZXCV",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        old_mtime = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=10)).timestamp()
+        os.utime(stale_file, (old_mtime, old_mtime))
+
+        prune_file = sessions_dir / "prune-session.jsonl"
+        prune_file.write_text(json.dumps({"role": "user", "content": "older than retention"}) + "\n", encoding="utf-8")
+        prune_mtime = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=40)).timestamp()
+        os.utime(prune_file, (prune_mtime, prune_mtime))
+
+        sessions_store = sessions_dir / "sessions.json"
+        sessions_store.write_text(
+            json.dumps(
+                {
+                    "keep": {"sessionId": "stale-session"},
+                    "drop": {"sessionId": "prune-session"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        run(
+            [
+                "python3",
+                str(script_dir / "session_hygiene.py"),
+                "--sessions-dir",
+                str(sessions_dir),
+                "--retention-days",
+                "30",
+                "--skip-recent-minutes",
+                "0",
+            ],
+            cwd=script_dir,
+        )
+        assert not prune_file.exists(), "session hygiene failed to prune stale JSONL session file"
+        stale_text = stale_file.read_text(encoding="utf-8")
+        assert "supersecretvalue" not in stale_text, "session hygiene failed to redact token value"
+        assert "<REDACTED>" in stale_text, "session hygiene did not insert redaction markers"
+        sessions_store_payload = json.loads(sessions_store.read_text(encoding="utf-8"))
+        assert "drop" not in sessions_store_payload, "session hygiene failed to prune stale sessions.json entry"
+        assert "keep" in sessions_store_payload, "session hygiene removed valid sessions.json entry"
+
+        sessions_dir_mode = stat.S_IMODE(sessions_dir.stat().st_mode)
+        stale_mode = stat.S_IMODE(stale_file.stat().st_mode)
+        store_mode = stat.S_IMODE(sessions_store.stat().st_mode)
+        assert sessions_dir_mode == 0o700, f"session hygiene dir permissions should be 0700, got {oct(sessions_dir_mode)}"
+        assert stale_mode == 0o600, f"session hygiene JSONL permissions should be 0600, got {oct(stale_mode)}"
+        assert store_mode == 0o600, f"session hygiene sessions.json permissions should be 0600, got {oct(store_mode)}"
+
+        run(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                "archive/transcripts",
+                "--transcript-mode",
+                "off",
+            ],
+            cwd=script_dir,
+        )
+        assert not list(transcript_root.glob("*.md")), "transcript-mode off should remove transcript mirror files"
 
         # Seed recurring semantic entries for identity promotion.
         sem_promote = workspace / "memory" / "semantic" / today.strftime("%Y-%m.md")
