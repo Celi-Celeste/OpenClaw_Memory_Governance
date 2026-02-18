@@ -11,6 +11,9 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+!skills/openclaw-memory-governance/dist/
+skills/openclaw-memory-governance/dist/*
+!skills/openclaw-memory-governance/dist/openclaw-memory-governance.zip
 downloads/
 eggs/
 .eggs/

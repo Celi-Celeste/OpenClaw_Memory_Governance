@@ -372,6 +372,35 @@ def main() -> int:
             cwd=script_dir,
         )
         assert external_guard.returncode != 0, "daily transcript root guard failed to block external transcript root"
+        external_lookup_day = today
+        external_lookup_phrase = "external allowed lookup phrase"
+        (external_root / f"{external_lookup_day.isoformat()}.md").write_text(
+            f"# {external_lookup_day.isoformat()}\n\n## 07:30:00 - user (external)\n{external_lookup_phrase}\n",
+            encoding="utf-8",
+        )
+        external_lookup_allowed = run(
+            [
+                "python3",
+                str(script_dir / "transcript_lookup.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                str(external_root),
+                "--allow-external-transcript-root",
+                "--topic",
+                external_lookup_phrase,
+                "--last-n-days",
+                "7",
+                "--max-excerpts",
+                "5",
+            ],
+            cwd=script_dir,
+        )
+        external_lookup_payload = json.loads(external_lookup_allowed.stdout)
+        assert external_lookup_payload["results"], "transcript lookup should return results when external root is explicitly allowed"
+        first_external = external_lookup_payload["results"][0]
+        assert not first_external["source_ref"].startswith("/"), "transcript lookup source_ref should not expose absolute paths"
+        assert first_external["source_ref"].endswith(f"{external_lookup_day.isoformat()}.md"), "transcript lookup source_ref mismatch for external root"
 
         external_override_guard = run_maybe_fail(
             [
@@ -667,6 +696,16 @@ def main() -> int:
             + "\n",
             encoding="utf-8",
         )
+        symlink_target_secret = "outside-target-secret-for-hygiene"
+        symlink_target_file = workspace.parent / "outside-session-hygiene.jsonl"
+        symlink_target_file.write_text(
+            json.dumps({"role": "user", "content": f"token={symlink_target_secret}"}) + "\n",
+            encoding="utf-8",
+        )
+        symlink_path = sessions_dir / "linked-outside-session.jsonl"
+        if symlink_path.exists() or symlink_path.is_symlink():
+            symlink_path.unlink()
+        os.symlink(symlink_target_file, symlink_path)
 
         run(
             [
@@ -690,6 +729,9 @@ def main() -> int:
         assert stale_nested_secret not in stale_text, "session hygiene failed to redact mixed-case nested secret fields"
         assert stale_nested_bearer not in stale_text, "session hygiene failed to redact bearer token patterns in nested text"
         assert "<REDACTED>" in stale_text, "session hygiene did not insert redaction markers"
+        assert symlink_path.is_symlink(), "session hygiene should ignore symlink JSONL files"
+        target_text = symlink_target_file.read_text(encoding="utf-8")
+        assert symlink_target_secret in target_text, "session hygiene should not rewrite symlink target files outside sessions dir"
         sessions_store_payload = json.loads(sessions_store.read_text(encoding="utf-8"))
         assert "drop" not in sessions_store_payload, "session hygiene failed to prune stale sessions.json entry"
         assert "keep" in sessions_store_payload, "session hygiene removed valid sessions.json entry"

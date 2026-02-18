@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from memory_lib import atomic_write_text, file_lock, redact_secrets
+from memory_lib import atomic_write_text, file_lock, is_under_root, redact_secrets
 
 SENSITIVE_KEY_RE = re.compile(
     r"(?i)(api[_-]?key|access[_-]?token|token|secret|password|passphrase|private[_-]?key|bearer)"
@@ -130,6 +130,28 @@ def prune_sessions_store(store_path: Path, existing_jsonl: set[str], dry_run: bo
     return removed
 
 
+def list_safe_jsonl_files(sessions_dir: Path) -> Tuple[list[Path], int, int]:
+    safe_files: list[Path] = []
+    skipped_symlink = 0
+    skipped_outside = 0
+    sessions_root = sessions_dir.resolve()
+    for path in sorted(sessions_dir.glob("*.jsonl")):
+        if path.is_symlink():
+            skipped_symlink += 1
+            continue
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError:
+            continue
+        if not resolved.is_file():
+            continue
+        if not is_under_root(resolved, sessions_root):
+            skipped_outside += 1
+            continue
+        safe_files.append(resolved)
+    return safe_files, skipped_symlink, skipped_outside
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sessions-dir", default="", help="Explicit OpenClaw sessions directory.")
@@ -160,11 +182,13 @@ def main() -> int:
         redacted_files = 0
         skipped_recent = 0
         pruned_files = 0
+        skipped_symlink = 0
+        skipped_outside = 0
 
         if apply_permissions(sessions_dir, 0o700, args.dry_run):
             perms_dirs += 1
 
-        jsonl_files = sorted(sessions_dir.glob("*.jsonl"))
+        jsonl_files, skipped_symlink, skipped_outside = list_safe_jsonl_files(sessions_dir)
         for path in jsonl_files:
             stat = path.stat()
             mtime = dt.datetime.fromtimestamp(stat.st_mtime, tz=dt.timezone.utc)
@@ -193,7 +217,7 @@ def main() -> int:
         if sessions_json.exists():
             if apply_permissions(sessions_json, 0o600, args.dry_run):
                 perms_files += 1
-            existing_jsonl = {p.name for p in sessions_dir.glob("*.jsonl")}
+            existing_jsonl = {p.name for p in jsonl_files if p.exists()}
             pruned_store_entries = prune_sessions_store(sessions_json, existing_jsonl=existing_jsonl, dry_run=args.dry_run)
         else:
             pruned_store_entries = 0
@@ -209,6 +233,8 @@ def main() -> int:
             f"redacted_events={redacted_events} "
             f"skipped_recent={skipped_recent} "
             f"pruned_files={pruned_files} "
+            f"skipped_symlink={skipped_symlink} "
+            f"skipped_outside={skipped_outside} "
             f"pruned_store_entries={pruned_store_entries}"
         )
         return 0

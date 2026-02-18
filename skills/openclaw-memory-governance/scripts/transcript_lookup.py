@@ -87,13 +87,20 @@ def lookup_transcripts(
             excerpt = redact_secrets(sec["body"].strip())
             if len(excerpt) > max_chars_per_excerpt:
                 excerpt = excerpt[: max_chars_per_excerpt - 3].rstrip() + "..."
+            if is_under_root(resolved, workspace):
+                source_ref = str(resolved.relative_to(workspace))
+            else:
+                try:
+                    source_ref = str(resolved.relative_to(transcript_dir))
+                except ValueError:
+                    source_ref = resolved.name
             results.append(
                 {
                     "date": day.isoformat(),
                     "header": redact_secrets(sec["header"]),
                     "score": score,
                     "excerpt": excerpt,
-                    "source_ref": str(resolved.relative_to(workspace)),
+                    "source_ref": source_ref,
                 }
             )
 
