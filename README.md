@@ -69,6 +69,13 @@ docs/
 
 ## Install Modes
 
+Recommended for most users:
+
+1. Install from ClawHub.
+2. Run `python3 skills/openclaw-memory-governance/scripts/activate.py` once.
+
+That is the **Combined** mode below, and it is the intended default rollout path.
+
 ### 1) Skill-only (works)
 
 Install the skill package and run cadence scripts.  
@@ -81,7 +88,8 @@ You get runtime tuning defaults, but no cadence governance automation.
 
 ### 3) Combined (recommended)
 
-Apply one config profile **and** install the skill package.
+Use ClawHub install **plus** one `activate.py` run.  
+`activate.py` applies the right profile (builtin or qmd), installs scheduler jobs, and runs a health check.
 
 ## Quick Start
 
