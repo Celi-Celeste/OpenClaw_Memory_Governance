@@ -28,6 +28,7 @@ Implement as scripts and prompts in this skill package:
 11. Executable confidence gate flow (`confidence_gate_flow.py`)
 12. Session hygiene controls (`session_hygiene.py` retention + redaction + permissions)
 13. Executable ordered recall wrapper (`ordered_recall.py`) with identity-first priority
+14. Backend auto-selection helper (`select_memory_profile.py`) for qmd vs builtin rollout
 
 ## Hard boundary
 

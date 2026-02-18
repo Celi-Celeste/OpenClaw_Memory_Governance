@@ -60,6 +60,7 @@ def main() -> int:
         "weekly_identity_promote.py",
         "weekly_drift_review.py",
         "transcript_lookup.py",
+        "select_memory_profile.py",
         "session_hygiene.py",
         "render_schedule.py",
         "smoke_suite.py",

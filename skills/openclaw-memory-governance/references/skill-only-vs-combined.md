@@ -24,6 +24,7 @@ Works and remains useful. You still get:
 7. transcript privacy defaults (`sanitized` mode + lookup redaction)
 8. session JSONL hygiene (`session_hygiene.py`)
 9. deterministic ordered recall wrapper (`ordered_recall.py`)
+10. backend auto-selection helper (`select_memory_profile.py`)
 
 Missing in skill-only mode:
 

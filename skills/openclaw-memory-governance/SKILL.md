@@ -16,6 +16,8 @@ Keep OpenClaw runtime behavior in config and implement cadence logic in this ski
 - `agents.defaults.memorySearch.*`
 - `memory.citations`, `memory.backend`, `memory.qmd.*`
 - `session.*`
+4. Use `select_memory_profile.py` to auto-detect qmd and pick the right profile:
+`select_memory_profile.py --workspace "<workspace>" --repo-root "<repo-root>" --apply`
 
 Never move cadence logic into OpenClaw core config keys that do not exist upstream.
 
@@ -54,6 +56,13 @@ supersedes: mem:<uuid>|none
 ## Cadence Operations
 
 Run these scripts from `scripts/` with `--workspace <path>`:
+
+0. `select_memory_profile.py`
+- Auto-detect qmd availability and choose profile automatically:
+  - qmd detected: selects `openclaw.memory-profile.qmd.json`
+  - qmd not detected: selects `openclaw.memory-profile.json`
+- Optional merge into OpenClaw config:
+  - `--target-config ~/.openclaw/openclaw.json --apply`
 
 1. `importance_score.py`
 - Re-score episodic/semantic memories using 5 signals:

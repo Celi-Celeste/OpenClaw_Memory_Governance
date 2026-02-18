@@ -92,6 +92,44 @@ def main() -> int:
         sessions_dir = workspace / "sessions"
         sessions_dir.mkdir(parents=True, exist_ok=True)
 
+        selector_builtin = run(
+            [
+                "python3",
+                str(script_dir / "select_memory_profile.py"),
+                "--workspace",
+                str(workspace),
+                "--repo-root",
+                str(repo_root),
+                "--qmd-command",
+                "definitely-missing-qmd-binary",
+                "--apply",
+            ],
+            cwd=script_dir,
+        )
+        selector_builtin_payload = json.loads(selector_builtin.stdout)
+        assert selector_builtin_payload["selected_backend"] == "builtin", "profile selector should choose builtin when qmd is unavailable"
+        selected_snapshot = workspace / "openclaw.memory-profile.selected.json"
+        assert selected_snapshot.exists(), "profile selector failed to write selected profile snapshot"
+        selected_snapshot_payload = json.loads(selected_snapshot.read_text(encoding="utf-8"))
+        assert selected_snapshot_payload.get("memory", {}).get("backend") != "qmd", "builtin selector snapshot should not set qmd backend"
+
+        selector_forced_qmd = run(
+            [
+                "python3",
+                str(script_dir / "select_memory_profile.py"),
+                "--workspace",
+                str(workspace),
+                "--repo-root",
+                str(repo_root),
+                "--force-backend",
+                "qmd",
+                "--dry-run",
+            ],
+            cwd=script_dir,
+        )
+        selector_forced_payload = json.loads(selector_forced_qmd.stdout)
+        assert selector_forced_payload["selected_backend"] == "qmd", "profile selector should honor forced qmd backend"
+
         today = dt.date.today()
         epi = workspace / "memory" / "episodic" / f"{today.isoformat()}.md"
         write_entries(

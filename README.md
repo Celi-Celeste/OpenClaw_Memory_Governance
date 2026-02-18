@@ -91,7 +91,18 @@ Bundle output:
 
 `skills/openclaw-memory-governance/dist/openclaw-memory-governance.zip`
 
-### C) Generate scheduler commands
+### C) Auto-select config backend (builtin vs qmd)
+
+```bash
+cd <repo-root>/skills/openclaw-memory-governance/scripts
+python3 select_memory_profile.py \
+  --workspace "$HOME/.openclaw/workspace" \
+  --repo-root "<repo-root>" \
+  --target-config "$HOME/.openclaw/openclaw.json" \
+  --apply
+```
+
+### D) Generate scheduler commands
 
 ```bash
 cd <repo-root>/skills/openclaw-memory-governance/scripts

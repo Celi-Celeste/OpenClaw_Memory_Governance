@@ -9,6 +9,19 @@
 5. Weekly: `weekly_drift_review.py`
 6. Daily: `session_hygiene.py`
 
+## Backend Profile Selection
+
+Use:
+
+`select_memory_profile.py --workspace "<workspace>" --repo-root "<repo-root>" --target-config "~/.openclaw/openclaw.json" --apply`
+
+Behavior:
+
+1. Detects whether `qmd` is available (`qmd --version`)
+2. Selects qmd profile if detected, otherwise builtin profile
+3. Writes `openclaw.memory-profile.selected.json` in workspace
+4. Optionally merges selected profile into target OpenClaw config
+
 Default transcript mirror root:
 
 `archive/transcripts/`

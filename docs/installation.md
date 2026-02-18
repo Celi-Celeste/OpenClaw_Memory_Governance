@@ -16,7 +16,18 @@ If your ClawHub instance requires raw files, upload the skill directory contents
 
 ## 2) Apply Config Profile (Recommended)
 
-Choose one profile:
+Auto-select profile (recommended):
+
+```bash
+cd <repo-root>/skills/openclaw-memory-governance/scripts
+python3 select_memory_profile.py \
+  --workspace "$HOME/.openclaw/workspace" \
+  --repo-root "<repo-root>" \
+  --target-config "$HOME/.openclaw/openclaw.json" \
+  --apply
+```
+
+Manual choice (if preferred):
 
 1. Builtin search:
    - `openclaw.memory-profile.json`
