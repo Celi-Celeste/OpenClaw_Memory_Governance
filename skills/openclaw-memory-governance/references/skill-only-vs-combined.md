@@ -23,6 +23,7 @@ Works and remains useful. You still get:
 6. confidence-gate response policy + executable gate script
 7. transcript privacy defaults (`sanitized` mode + lookup redaction)
 8. session JSONL hygiene (`session_hygiene.py`)
+9. deterministic ordered recall wrapper (`ordered_recall.py`)
 
 Missing in skill-only mode:
 

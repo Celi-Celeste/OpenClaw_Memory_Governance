@@ -56,6 +56,7 @@ def main() -> int:
         "daily_consolidate.py",
         "confidence_gate.py",
         "confidence_gate_flow.py",
+        "ordered_recall.py",
         "weekly_identity_promote.py",
         "weekly_drift_review.py",
         "transcript_lookup.py",

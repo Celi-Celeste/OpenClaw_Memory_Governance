@@ -59,4 +59,5 @@ cd <repo-root>
 source .venv/bin/activate
 python3 skills/openclaw-memory-governance/scripts/smoke_suite.py
 python3 skills/openclaw-memory-governance/scripts/quick_validate_local.py
+python3 scripts/check_docs_links.py
 ```

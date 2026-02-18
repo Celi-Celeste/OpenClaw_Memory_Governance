@@ -803,6 +803,30 @@ def main() -> int:
         assert "Project burst topic this week only." not in identity_text, "identity promotion should skip transient project bursts"
         assert "Expired decision candidate should never be promoted." not in decisions_text, "identity promotion should skip expired candidates"
 
+        ordered_recall = run(
+            [
+                "python3",
+                str(script_dir / "ordered_recall.py"),
+                "--workspace",
+                str(workspace),
+                "--topic",
+                "core identity truth project focus reliable openclaw memory continuity",
+                "--max-results",
+                "9",
+                "--max-per-layer",
+                "3",
+            ],
+            cwd=script_dir,
+        )
+        ordered_payload = json.loads(ordered_recall.stdout)
+        assert ordered_payload["results"], "ordered recall returned no results for known identity topic"
+        first_result = ordered_payload["results"][0]
+        assert first_result["layer"] == "identity", "ordered recall should prioritize identity layer first"
+        assert first_result["source_ref"] == "memory/identity/identity.md", "ordered recall should prioritize identity.md first"
+        assert not any(
+            "archive/transcripts" in item["source_ref"] for item in ordered_payload["results"]
+        ), "ordered recall should not include transcript mirror files"
+
         print("smoke_suite ok")
     return 0
 

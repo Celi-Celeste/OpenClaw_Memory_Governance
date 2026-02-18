@@ -15,9 +15,11 @@ flowchart TD
     D --> G["Weekly Identity Promotion"]
     D --> H["Weekly Drift Review"]
     D --> I["Confidence Gate"]
+    D --> L["Ordered Recall Wrapper"]
     D --> J["On-demand Transcript Lookup"]
     C --> K["Workspace Memory Files"]
     C --> I
+    L --> K
     E --> K
     F --> K
     G --> K

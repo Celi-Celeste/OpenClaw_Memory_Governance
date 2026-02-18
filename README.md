@@ -77,6 +77,7 @@ cd <repo-root>
 source .venv/bin/activate
 python3 skills/openclaw-memory-governance/scripts/smoke_suite.py
 python3 skills/openclaw-memory-governance/scripts/quick_validate_local.py
+python3 scripts/check_docs_links.py
 ```
 
 ### B) Build upload bundle for ClawHub
@@ -167,11 +168,3 @@ Docs entrypoint:
 ## License
 
 This repository currently uses the MIT license (`LICENSE`).
-
-## Gems of War Team AI Starter
-
-A standalone starter for building a local Gems of War card database and generating synergy-based team recommendations now lives at:
-
-`gow_ai/README.md`
-
-It includes SQLite schema, JSON ingest, rule-based feature extraction, and baseline team recommendation scoring.

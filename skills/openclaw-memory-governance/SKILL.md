@@ -119,11 +119,20 @@ Run these scripts from `scripts/` with `--workspace <path>`:
 - If confidence is weak and lookup is not approved, returns ask-lookup action.
 - If lookup is approved, performs bounded `transcript_lookup` and returns excerpts.
 
-9. `render_schedule.py`
+9. `ordered_recall.py`
+- Execute deterministic memory recall in this order:
+  - `identity.md`
+  - `preferences.md`
+  - `decisions.md`
+  - semantic results
+  - episodic results
+- Keep transcript mirror out of normal recall.
+
+10. `render_schedule.py`
 - Print crontab entries and optionally generate launchd plists.
 - Use this to install routine hourly/daily/weekly cadence jobs.
 
-10. `session_hygiene.py`
+11. `session_hygiene.py`
 - Harden OpenClaw session storage (`~/.openclaw/agents/<id>/sessions` by default).
 - Apply permissions (`0700` dir, `0600` files).
 - Redact likely secrets in stale JSONL transcript lines.
@@ -157,6 +166,10 @@ Identity recall priority within identity layer:
 1. `identity.md`
 2. `preferences.md`
 3. `decisions.md`
+
+Executable ordered recall command:
+
+`ordered_recall.py --workspace "<workspace>" --topic "<topic>" --max-results 12 --max-per-layer 4`
 
 ## Hard Boundary
 

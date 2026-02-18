@@ -64,6 +64,19 @@ Flow behavior:
 2. Low confidence + not approved: returns `partial_and_ask_lookup` with user prompt
 3. Low confidence + approved: performs bounded transcript lookup and returns excerpts
 
+## Ordered Memory Recall
+
+Use:
+
+`ordered_recall.py --workspace "<workspace>" --topic "<topic>" --max-results 12 --max-per-layer 4`
+
+Behavior:
+
+1. Enforces layer order: `identity -> semantic -> episodic`
+2. Enforces identity file order: `identity.md -> preferences.md -> decisions.md`
+3. Keeps transcript archives out of normal recall
+4. Returns deterministic JSON excerpts for wrapper/tool usage
+
 ## Importance Scoring (Items 1 + 5)
 
 Use:
@@ -106,6 +119,7 @@ After each OpenClaw update:
 5. Confirm weekly identity promotion routes to `identity.md`, `preferences.md`, and `decisions.md`
 6. Confirm weekly drift marks superseded entries `historical`
 7. Confirm `session_hygiene.py` still applies permissions and retention to session JSONL logs
+8. Confirm `ordered_recall.py` still returns identity-first results
 
 ## Session Hygiene (Point 3)
 

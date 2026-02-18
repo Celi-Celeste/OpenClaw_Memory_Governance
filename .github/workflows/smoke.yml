@@ -22,6 +22,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pyyaml
 
+      - name: Check docs links
+        run: |
+          python scripts/check_docs_links.py
+
       - name: Run smoke suite
         run: |
           python skills/openclaw-memory-governance/scripts/smoke_suite.py
