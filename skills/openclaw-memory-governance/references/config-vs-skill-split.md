@@ -31,6 +31,7 @@ Implement as scripts and prompts in this skill package:
 14. Backend auto-selection helper (`select_memory_profile.py`) for qmd vs builtin rollout
 15. One-time backend bootstrap marker flow (`bootstrap_profile_once.py`)
 16. Unified activation entrypoint (`activate.py`) for bootstrap + scheduler install, with `--force-bootstrap` for post-install qmd changes
+17. Governance health/self-heal doctor (`governance_doctor.py`) for post-activation checks and optional fixes
 
 ## Hard boundary
 

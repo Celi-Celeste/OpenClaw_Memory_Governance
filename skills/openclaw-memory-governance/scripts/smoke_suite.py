@@ -190,6 +190,48 @@ def main() -> int:
         assert activate_payload["scheduler"]["status"] == "skipped", "activate should skip scheduler when explicitly disabled"
         assert activate_payload["force_bootstrap"] is True, "activate should report forced bootstrap mode"
         assert activate_payload["bootstrap"]["status"] == "applied", "activate should re-apply bootstrap when forced"
+        assert activate_payload["doctor"]["status"] in {"ok", "warn"}, "activate doctor should report ok/warn for scheduler-none path"
+
+        doctor_strict = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "governance_doctor.py"),
+                "--workspace",
+                str(workspace),
+                "--target-config",
+                str(target_config),
+                "--launchd-dir",
+                str(workspace / "memory-plists"),
+                "--mode",
+                "quick",
+                "--strict",
+                "--json",
+            ],
+            cwd=script_dir,
+        )
+        assert doctor_strict.returncode != 0, "governance_doctor --strict should fail when warnings exist"
+        doctor_strict_payload = json.loads(doctor_strict.stdout)
+        assert doctor_strict_payload["status"] == "warn", "strict doctor should report warn when scheduler is missing"
+
+        doctor_fix = run(
+            [
+                "python3",
+                str(script_dir / "governance_doctor.py"),
+                "--workspace",
+                str(workspace),
+                "--target-config",
+                str(target_config),
+                "--launchd-dir",
+                str(workspace / "memory-plists"),
+                "--mode",
+                "quick",
+                "--fix",
+                "--json",
+            ],
+            cwd=script_dir,
+        )
+        doctor_fix_payload = json.loads(doctor_fix.stdout)
+        assert doctor_fix_payload["status"] in {"ok", "warn"}, "fix doctor should complete successfully"
 
         today = dt.date.today()
         epi = workspace / "memory" / "episodic" / f"{today.isoformat()}.md"

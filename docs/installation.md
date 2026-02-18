@@ -43,6 +43,13 @@ python3 activate.py --force-bootstrap
 3. install scheduler jobs (`launchd` on macOS, `cron` elsewhere)
 4. run backend bootstrap in one-time marker mode
 5. support forced backend re-bootstrap via `--force-bootstrap` when qmd availability changes later
+6. run `governance_doctor.py --mode quick` and report health (`ok|warn|fail`)
+
+Optional deep post-install health audit:
+
+```bash
+python3 governance_doctor.py --mode full
+```
 
 Advanced manual profile control (optional):
 

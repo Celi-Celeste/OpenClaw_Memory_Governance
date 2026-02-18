@@ -63,6 +63,7 @@ def main() -> int:
         "select_memory_profile.py",
         "bootstrap_profile_once.py",
         "activate.py",
+        "governance_doctor.py",
         "session_hygiene.py",
         "render_schedule.py",
         "smoke_suite.py",

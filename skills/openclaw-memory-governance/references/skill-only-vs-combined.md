@@ -28,6 +28,7 @@ Works and remains useful. You still get:
 11. one-time backend bootstrap runner (`bootstrap_profile_once.py`)
 12. one-command activation entrypoint (`activate.py`)
 13. forced backend re-bootstrap support (`activate.py --force-bootstrap`) when qmd is added later
+14. post-activation health/self-heal checks (`governance_doctor.py`)
 
 Missing in skill-only mode:
 

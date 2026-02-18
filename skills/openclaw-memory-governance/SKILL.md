@@ -11,6 +11,7 @@ Keep OpenClaw runtime behavior in config and implement cadence logic in this ski
 
 Installing this skill does not start cadence jobs.  
 You must install cron/launchd entries from `render_schedule.py` or the governance logic will not run.
+`activate.py` is the preferred path because it installs scheduler entries and runs a quick doctor check.
 
 ## Apply Config-Only Profile
 
@@ -69,6 +70,14 @@ Run these scripts from `scripts/` with `--workspace <path>`:
   - macOS: `launchd`
   - non-macOS: `cron`
 - If qmd is installed later, rerun with `--force-bootstrap` to re-detect backend and switch profile.
+- Runs `governance_doctor.py --mode quick` after activation.
+
+0c. `governance_doctor.py`
+- Health and self-heal checks for activation state, scheduler presence, backend/profile alignment, transcript/session permissions, and stale locks.
+- Modes:
+  - `--mode quick` for post-activation checks
+  - `--mode full` for deeper scheduler/freshness checks
+- Optional `--fix` applies safe local remediations.
 
 0a. `select_memory_profile.py`
 - Auto-detect qmd availability and choose profile automatically:

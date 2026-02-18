@@ -13,7 +13,8 @@ Required after install:
 1. Run one activation command:
    - `python3 skills/openclaw-memory-governance/scripts/activate.py`
 2. Activation auto-detects qmd vs builtin backend and installs scheduler jobs.
-3. If qmd is installed later, rerun with:
+3. Activation runs a quick governance health check and reports `ok|warn|fail`.
+4. If qmd is installed later, rerun with:
    - `python3 skills/openclaw-memory-governance/scripts/activate.py --force-bootstrap`
 
 ## What This Project Does
@@ -118,12 +119,20 @@ If qmd is installed later, rerun activation with:
 python3 activate.py --force-bootstrap
 ```
 
+Activation includes a post-run doctor check.  
+For a deeper audit run:
+
+```bash
+python3 governance_doctor.py --mode full
+```
+
 `activate.py` does all of the following:
 
 1. Runs one-time backend bootstrap (qmd detection + profile apply)
 2. Merges selected profile into `~/.openclaw/openclaw.json`
 3. Installs scheduler jobs (`launchd` on macOS, `cron` elsewhere)
-4. Leaves a state marker so bootstrap remains one-time
+4. Runs `governance_doctor.py --mode quick` for immediate health checks
+5. Leaves a state marker so bootstrap remains one-time
 
 ### D) Advanced Manual Setup
 

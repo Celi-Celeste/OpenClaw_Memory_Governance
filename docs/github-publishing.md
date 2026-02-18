@@ -9,6 +9,8 @@ Post-install command users should run:
 
 `python3 skills/openclaw-memory-governance/scripts/activate.py`
 
+This command also runs a quick governance doctor health check.
+
 If qmd is installed later, users should rerun:
 
 `python3 skills/openclaw-memory-governance/scripts/activate.py --force-bootstrap`

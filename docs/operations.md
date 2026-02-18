@@ -13,6 +13,16 @@ If qmd is installed later, rerun:
 
 `activate.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json" --force-bootstrap`
 
+Activation runs `governance_doctor.py --mode quick` automatically.
+
+Run full health audit:
+
+`governance_doctor.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json" --mode full`
+
+Apply safe self-heal fixes during audit:
+
+`governance_doctor.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json" --mode full --fix`
+
 ## Cadence Jobs
 
 1. Hourly: `hourly_semantic_extract.py`

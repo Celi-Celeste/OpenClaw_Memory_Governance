@@ -16,9 +16,15 @@ Recommended activation command after install:
 
 `python3 skills/openclaw-memory-governance/scripts/activate.py`
 
+Activation runs a quick governance doctor check automatically.
+
 If qmd is installed later, rerun:
 
 `python3 skills/openclaw-memory-governance/scripts/activate.py --force-bootstrap`
+
+Optional deep health audit:
+
+`python3 skills/openclaw-memory-governance/scripts/governance_doctor.py --mode full`
 
 ## Start Here
 

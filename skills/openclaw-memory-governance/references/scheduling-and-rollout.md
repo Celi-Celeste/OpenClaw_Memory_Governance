@@ -13,11 +13,15 @@ Recommended first action after install:
 
 `python3 scripts/activate.py`
 
-This single command runs backend bootstrap and installs scheduler entries.
+This single command runs backend bootstrap, installs scheduler entries, and runs a quick doctor health check.
 
 If qmd is installed after initial activation, rerun:
 
 `python3 scripts/activate.py --force-bootstrap`
+
+Optional deep health audit:
+
+`python3 scripts/governance_doctor.py --mode full`
 
 Cadence jobs:
 

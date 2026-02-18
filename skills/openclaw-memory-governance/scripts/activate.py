@@ -62,6 +62,49 @@ def _run_bootstrap(
     return payload
 
 
+def _run_doctor(
+    script_dir: Path,
+    workspace: Path,
+    target_config: Path,
+    agent_id: str,
+    launchd_dir: Path,
+    qmd_command: str,
+    qmd_timeout_seconds: int,
+) -> dict:
+    cmd = [
+        sys.executable,
+        str(script_dir / "governance_doctor.py"),
+        "--workspace",
+        str(workspace),
+        "--target-config",
+        str(target_config),
+        "--agent-id",
+        agent_id,
+        "--launchd-dir",
+        str(launchd_dir),
+        "--qmd-command",
+        qmd_command,
+        "--qmd-timeout-seconds",
+        str(qmd_timeout_seconds),
+        "--mode",
+        "quick",
+        "--json",
+    ]
+    proc = _run(cmd, check=False)
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        payload = {
+            "status": "fail",
+            "error": f"doctor_json_decode_failed:{exc.__class__.__name__}",
+            "returncode": proc.returncode,
+            "stdout": proc.stdout[-2000:],
+            "stderr": proc.stderr[-2000:],
+        }
+    payload["returncode"] = proc.returncode
+    return payload
+
+
 def _install_cron(lines: List[str], dry_run: bool) -> dict:
     existing_proc = _run(["crontab", "-l"], check=False)
     if existing_proc.returncode == 0:
@@ -215,6 +258,11 @@ def main() -> int:
     parser.add_argument("--target-config", default=str(Path.home() / ".openclaw" / "openclaw.json"))
     parser.add_argument("--scheduler", choices=["auto", "cron", "launchd", "none"], default="auto")
     parser.add_argument("--launchd-dir", default=str(Path.home() / ".openclaw" / "memory-plists"))
+    parser.add_argument(
+        "--skip-doctor",
+        action="store_true",
+        help="Skip post-activation governance doctor check.",
+    )
     parser.add_argument("--qmd-command", default="qmd")
     parser.add_argument("--qmd-timeout-seconds", type=int, default=4)
     parser.add_argument(
@@ -228,6 +276,7 @@ def main() -> int:
     script_dir = Path(__file__).resolve().parent
     workspace = Path(args.workspace).expanduser().resolve()
     target_config = Path(args.target_config).expanduser().resolve()
+    launchd_dir = Path(args.launchd_dir).expanduser().resolve()
     scheduler = _resolve_scheduler(args.scheduler)
 
     bootstrap = _run_bootstrap(
@@ -248,7 +297,6 @@ def main() -> int:
         cron_result = _install_cron(lines=lines, dry_run=args.dry_run)
         schedule_result = {"scheduler": "cron", "status": "installed", **cron_result}
     else:
-        launchd_dir = Path(args.launchd_dir).expanduser().resolve()
         plists = _generate_launchd(workspace=workspace, scripts_dir=script_dir, launchd_dir=launchd_dir, agent_id=args.agent_id)
         launchd_result = _install_launchd(plist_paths=plists, dry_run=args.dry_run)
         schedule_result = {
@@ -258,16 +306,39 @@ def main() -> int:
             **launchd_result,
         }
 
+    doctor_result: dict
+    if args.skip_doctor:
+        doctor_result = {"status": "skipped", "reason": "skip_doctor"}
+    elif args.dry_run:
+        doctor_result = {"status": "skipped", "reason": "dry_run"}
+    else:
+        doctor_result = _run_doctor(
+            script_dir=script_dir,
+            workspace=workspace,
+            target_config=target_config,
+            agent_id=args.agent_id,
+            launchd_dir=launchd_dir,
+            qmd_command=args.qmd_command,
+            qmd_timeout_seconds=args.qmd_timeout_seconds,
+        )
+
+    overall_status = "ok"
+    if doctor_result.get("status") == "fail":
+        overall_status = "fail"
+
     payload = {
-        "status": "ok",
+        "status": overall_status,
         "workspace": str(workspace),
         "target_config": str(target_config),
         "bootstrap": bootstrap,
         "force_bootstrap": bool(args.force_bootstrap),
         "scheduler": schedule_result,
+        "doctor": doctor_result,
         "dry_run": bool(args.dry_run),
     }
     print(json.dumps(payload, indent=2))
+    if overall_status == "fail":
+        return 1
     return 0
 
 
