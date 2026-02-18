@@ -289,6 +289,14 @@ def main() -> int:
         default="sanitized",
         help="sanitized=redact likely secrets, full=raw transcript text, off=disable mirror files.",
     )
+    parser.add_argument(
+        "--acknowledge-transcript-risk",
+        action="store_true",
+        help=(
+            "Required when using risky transcript options "
+            "(full mode, external root, or root under memory/)."
+        ),
+    )
     parser.add_argument("--sessions-dir", default="", help="Path to OpenClaw sessions directory.")
     parser.add_argument("--agent-id", default="", help="Agent id used to infer ~/.openclaw/agents/<id>/sessions.")
     parser.add_argument("--dry-run", action="store_true")
@@ -298,6 +306,19 @@ def main() -> int:
     ensure_workspace_layout(workspace)
     sessions_dir = resolve_sessions_dir(args)
     transcript_dir = resolve_transcript_root(workspace, args.transcript_root)
+    risky_options = []
+    if args.transcript_mode == "full":
+        risky_options.append("transcript-mode=full")
+    if args.allow_external_transcript_root:
+        risky_options.append("allow-external-transcript-root")
+    if args.allow_transcripts_under_memory:
+        risky_options.append("allow-transcripts-under-memory")
+    if risky_options and not args.acknowledge_transcript_risk:
+        raise SystemExit(
+            "Refusing risky transcript options without explicit acknowledgment. "
+            f"Detected: {', '.join(risky_options)}. "
+            "Re-run with --acknowledge-transcript-risk if this is intentional."
+        )
     if not is_under_root(transcript_dir, workspace) and not args.allow_external_transcript_root:
         raise SystemExit(
             "Refusing transcript root outside workspace. Keep transcripts under workspace/, "

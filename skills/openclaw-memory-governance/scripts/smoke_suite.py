@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from memory_lib import write_memory_file
+from memory_lib import redact_secrets, write_memory_file
 
 
 def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
@@ -70,6 +70,18 @@ def main() -> int:
     qmd_cfg = profile_obj.get("memory", {}).get("qmd", {})
     paths_cfg = qmd_cfg.get("paths", [])
     assert not any(p.get("path") == "./memory" for p in paths_cfg), "qmd profile should not duplicate-index ./memory"
+    redaction_fixture = (
+        "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456 "
+        "SeCrEt: fixture-secret-value "
+        "api_key=sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456 "
+        "-----BEGIN PRIVATE KEY-----\\nABCDEF\\n-----END PRIVATE KEY-----"
+    )
+    redacted_fixture = redact_secrets(redaction_fixture)
+    assert "abcdefghijklmnopqrstuvwxyz123456" not in redacted_fixture, "redaction fixture leaked bearer token"
+    assert "fixture-secret-value" not in redacted_fixture, "redaction fixture leaked mixed-case secret assignment"
+    assert "sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456" not in redacted_fixture, "redaction fixture leaked API key"
+    assert "BEGIN PRIVATE KEY" not in redacted_fixture, "redaction fixture leaked private key block"
+    assert "<REDACTED>" in redacted_fixture, "redaction fixture should include redaction marker"
 
     with tempfile.TemporaryDirectory(prefix="oc-mem-smoke-") as td:
         workspace = Path(td)
@@ -212,18 +224,29 @@ def main() -> int:
 
         # Seed session transcript for daily mirror build.
         event_ts = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        transcript_bearer = "zxywvutsrqponmlkjihgfedcba987654"
+        transcript_secret_value = "transcript-secret-value"
+        transcript_private_key = "TRANSCRIPT-PRIVATE-KEY"
         events = [
             {
                 "timestamp": event_ts,
                 "role": "user",
                 "content": (
                     "Please revisit memory cadence and transcript lookup details. "
-                    "api_key=sk-1234567890ABCDEFGHIJKLMNOP"
+                    "api_key=sk-1234567890ABCDEFGHIJKLMNOP "
+                    f"Authorization: Bearer {transcript_bearer} "
+                    f"SeCrEt: {transcript_secret_value}"
                 ),
             },
             {
                 "timestamp": event_ts,
                 "role": "assistant",
+                "content": (
+                    "Key material sample "
+                    "-----BEGIN PRIVATE KEY----- "
+                    f"{transcript_private_key} "
+                    "-----END PRIVATE KEY-----"
+                ),
                 "internal_payload": {
                     "debug_token": "Bearer abcdefghijklmnopqrstuvwxyz123456",
                 },
@@ -272,6 +295,69 @@ def main() -> int:
         )
         assert guard.returncode != 0, "daily transcript root guard failed to block memory/transcripts"
 
+        full_mode_guard = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                "archive/transcripts",
+                "--transcript-mode",
+                "full",
+            ],
+            cwd=script_dir,
+        )
+        assert full_mode_guard.returncode != 0, "daily consolidate should require explicit ack for transcript-mode full"
+
+        full_mode_ack = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                "archive/transcripts",
+                "--transcript-mode",
+                "full",
+                "--acknowledge-transcript-risk",
+                "--dry-run",
+            ],
+            cwd=script_dir,
+        )
+        assert full_mode_ack.returncode == 0, "daily consolidate should allow transcript-mode full with explicit ack"
+
+        memory_override_guard = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                "memory/transcripts",
+                "--allow-transcripts-under-memory",
+                "--dry-run",
+            ],
+            cwd=script_dir,
+        )
+        assert memory_override_guard.returncode != 0, "daily consolidate should require explicit ack for memory-root override"
+
+        memory_override_ack = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                "memory/transcripts",
+                "--allow-transcripts-under-memory",
+                "--acknowledge-transcript-risk",
+                "--dry-run",
+            ],
+            cwd=script_dir,
+        )
+        assert memory_override_ack.returncode == 0, "daily consolidate should allow memory-root override with explicit ack"
+
         external_root = workspace.parent / "outside-transcripts"
         external_root.mkdir(parents=True, exist_ok=True)
         external_guard = run_maybe_fail(
@@ -286,6 +372,37 @@ def main() -> int:
             cwd=script_dir,
         )
         assert external_guard.returncode != 0, "daily transcript root guard failed to block external transcript root"
+
+        external_override_guard = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                str(external_root),
+                "--allow-external-transcript-root",
+                "--dry-run",
+            ],
+            cwd=script_dir,
+        )
+        assert external_override_guard.returncode != 0, "daily consolidate should require explicit ack for external-root override"
+
+        external_override_ack = run_maybe_fail(
+            [
+                "python3",
+                str(script_dir / "daily_consolidate.py"),
+                "--workspace",
+                str(workspace),
+                "--transcript-root",
+                str(external_root),
+                "--allow-external-transcript-root",
+                "--acknowledge-transcript-risk",
+                "--dry-run",
+            ],
+            cwd=script_dir,
+        )
+        assert external_override_ack.returncode == 0, "daily consolidate should allow external-root override with explicit ack"
 
         run(
             [
@@ -323,6 +440,9 @@ def main() -> int:
         transcript_text = transcript.read_text(encoding="utf-8")
         assert "<REDACTED>" in transcript_text, "daily transcript mirror did not redact sensitive content"
         assert "sk-1234567890ABCDEFGHIJKLMNOP" not in transcript_text, "daily transcript mirror leaked raw API key"
+        assert transcript_bearer not in transcript_text, "daily transcript mirror leaked bearer token content"
+        assert transcript_secret_value not in transcript_text, "daily transcript mirror leaked mixed-case secret assignment"
+        assert transcript_private_key not in transcript_text, "daily transcript mirror leaked private key material"
         assert "internal_payload" not in transcript_text, "daily transcript mirror should skip non-text session payloads"
         assert external_session_phrase not in transcript_text, "daily transcript mirror should skip session symlink inputs"
         mode = stat.S_IMODE(transcript.stat().st_mode)
@@ -510,6 +630,9 @@ def main() -> int:
 
         # Validate session hygiene controls for upstream session JSONL risk.
         stale_file = sessions_dir / "stale-session.jsonl"
+        stale_nested_token = "nested-array-token-value"
+        stale_nested_secret = "nested-secret-value"
+        stale_nested_bearer = "nestedbearertokenabcdefghijklmnopqrstuvwxyz987654"
         stale_file.write_text(
             json.dumps(
                 {
@@ -518,6 +641,8 @@ def main() -> int:
                     "content": "token=supersecretvalue and api_key=sk-ABCDEF1234567890ZXCV",
                     "password": "plain-password-value",
                     "metadata": {"api_key": "plain-structured-api-key"},
+                    "history": [{"access-token": stale_nested_token}, {"note": f"Bearer {stale_nested_bearer}"}],
+                    "nested": {"seCrEt": stale_nested_secret},
                 }
             )
             + "\n",
@@ -561,6 +686,9 @@ def main() -> int:
         assert "supersecretvalue" not in stale_text, "session hygiene failed to redact token value"
         assert "plain-password-value" not in stale_text, "session hygiene failed to redact structured password fields"
         assert "plain-structured-api-key" not in stale_text, "session hygiene failed to redact nested structured API keys"
+        assert stale_nested_token not in stale_text, "session hygiene failed to redact nested array token fields"
+        assert stale_nested_secret not in stale_text, "session hygiene failed to redact mixed-case nested secret fields"
+        assert stale_nested_bearer not in stale_text, "session hygiene failed to redact bearer token patterns in nested text"
         assert "<REDACTED>" in stale_text, "session hygiene did not insert redaction markers"
         sessions_store_payload = json.loads(sessions_store.read_text(encoding="utf-8"))
         assert "drop" not in sessions_store_payload, "session hygiene failed to prune stale sessions.json entry"

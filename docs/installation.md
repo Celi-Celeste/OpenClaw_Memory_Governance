@@ -43,6 +43,10 @@ Notes:
 3. Importance scoring defaults are included in generated schedules (`importance_score.py`).
 4. Session hygiene defaults are included in generated schedules (`session_hygiene.py`).
 5. Weekly cadence now includes identity promotion before drift review.
+6. Risky transcript overrides require `--acknowledge-transcript-risk`:
+   - `--transcript-mode full`
+   - `--allow-external-transcript-root`
+   - `--allow-transcripts-under-memory`
 
 Optional high-security mode:
 

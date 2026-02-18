@@ -118,6 +118,13 @@ python3 daily_consolidate.py \
   --transcript-mode off
 ```
 
+Risk acknowledgment requirement:
+
+`daily_consolidate.py` now requires `--acknowledge-transcript-risk` when using any risky transcript override:
+1. `--transcript-mode full`
+2. `--allow-external-transcript-root`
+3. `--allow-transcripts-under-memory`
+
 ## GitHub Publishing
 
 This repo is ready for GitHub publishing. If your GitHub repo already exists:

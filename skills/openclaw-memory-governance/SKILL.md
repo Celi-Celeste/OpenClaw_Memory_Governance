@@ -78,6 +78,10 @@ Run these scripts from `scripts/` with `--workspace <path>`:
   - set transcript file permissions to `0600`
 - Refuse transcript roots under `memory/` unless explicitly overridden.
 - Refuse transcript roots outside workspace unless explicitly overridden.
+- Require `--acknowledge-transcript-risk` for any risky override:
+  - `--transcript-mode full`
+  - `--allow-external-transcript-root`
+  - `--allow-transcripts-under-memory`
 - Optional high-security mode: `--transcript-mode off` removes mirror files.
 
 4. `weekly_identity_promote.py`

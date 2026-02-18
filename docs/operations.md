@@ -25,6 +25,13 @@ Optional high-security mode:
 
 `daily_consolidate.py --workspace "<workspace>" --agent-id main --transcript-root archive/transcripts --transcript-mode off`
 
+Risky override acknowledgment:
+
+`daily_consolidate.py` requires `--acknowledge-transcript-risk` for:
+1. `--transcript-mode full`
+2. `--allow-external-transcript-root`
+3. `--allow-transcripts-under-memory`
+
 ## Transcript Lookup
 
 Use:
