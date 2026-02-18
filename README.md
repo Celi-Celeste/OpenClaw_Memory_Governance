@@ -2,6 +2,20 @@
 
 Upgrade-safe memory governance for OpenClaw, built as a **skill + config profile split** so you can keep using upstream OpenClaw updates without maintaining a core fork.
 
+## Critical: Post-Install Activation Required
+
+Installing from ClawHub only copies files. It does **not** auto-run cadence jobs.
+
+If you skip activation, this memory system will not run.
+
+Required after install:
+
+1. Run one activation command:
+   - `python3 skills/openclaw-memory-governance/scripts/activate.py`
+2. Activation auto-detects qmd vs builtin backend and installs scheduler jobs.
+3. If qmd is installed later, rerun with:
+   - `python3 skills/openclaw-memory-governance/scripts/activate.py --force-bootstrap`
+
 ## What This Project Does
 
 This project adds operational memory governance on top of OpenClaw:
@@ -91,18 +105,27 @@ Bundle output:
 
 `skills/openclaw-memory-governance/dist/openclaw-memory-governance.zip`
 
-### C) Auto-select config backend (builtin vs qmd)
+### C) Activate (one command)
 
 ```bash
 cd <repo-root>/skills/openclaw-memory-governance/scripts
-python3 select_memory_profile.py \
-  --workspace "$HOME/.openclaw/workspace" \
-  --repo-root "<repo-root>" \
-  --target-config "$HOME/.openclaw/openclaw.json" \
-  --apply
+python3 activate.py
 ```
 
-### D) Generate scheduler commands
+If qmd is installed later, rerun activation with:
+
+```bash
+python3 activate.py --force-bootstrap
+```
+
+`activate.py` does all of the following:
+
+1. Runs one-time backend bootstrap (qmd detection + profile apply)
+2. Merges selected profile into `~/.openclaw/openclaw.json`
+3. Installs scheduler jobs (`launchd` on macOS, `cron` elsewhere)
+4. Leaves a state marker so bootstrap remains one-time
+
+### D) Advanced Manual Setup
 
 ```bash
 cd <repo-root>/skills/openclaw-memory-governance/scripts

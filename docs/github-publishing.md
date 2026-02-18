@@ -1,5 +1,18 @@
 # GitHub Publishing (First-Time Friendly)
 
+## Critical for Users
+
+If users install this skill from ClawHub, they must still install scheduler jobs (cron/launchd).  
+Without scheduler activation, cadence scripts do not run.
+
+Post-install command users should run:
+
+`python3 skills/openclaw-memory-governance/scripts/activate.py`
+
+If qmd is installed later, users should rerun:
+
+`python3 skills/openclaw-memory-governance/scripts/activate.py --force-bootstrap`
+
 ## 1) Create a GitHub Repository
 
 In your OpenClaw GitHub account:

@@ -1,5 +1,18 @@
 # Architecture
 
+## Critical Setup Note
+
+This architecture depends on scheduled cadence jobs.  
+ClawHub install alone does not activate job execution.
+
+Activation command:
+
+`python3 skills/openclaw-memory-governance/scripts/activate.py`
+
+If qmd is installed later, rerun:
+
+`python3 skills/openclaw-memory-governance/scripts/activate.py --force-bootstrap`
+
 ## Design Goal
 
 Improve long-horizon memory quality while preserving upstream OpenClaw compatibility.

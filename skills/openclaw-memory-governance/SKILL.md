@@ -7,6 +7,11 @@ description: Enforce upgrade-safe OpenClaw memory operations with a strict confi
 
 Keep OpenClaw runtime behavior in config and implement cadence logic in this skill package.
 
+## Critical Activation Requirement
+
+Installing this skill does not start cadence jobs.  
+You must install cron/launchd entries from `render_schedule.py` or the governance logic will not run.
+
 ## Apply Config-Only Profile
 
 1. Use `openclaw.memory-profile.json` in your OpenClaw workspace root for builtin memory search.
@@ -17,7 +22,7 @@ Keep OpenClaw runtime behavior in config and implement cadence logic in this ski
 - `memory.citations`, `memory.backend`, `memory.qmd.*`
 - `session.*`
 4. Use `select_memory_profile.py` to auto-detect qmd and pick the right profile:
-`select_memory_profile.py --workspace "<workspace>" --repo-root "<repo-root>" --apply`
+`select_memory_profile.py --workspace "<workspace>" --apply`
 
 Never move cadence logic into OpenClaw core config keys that do not exist upstream.
 
@@ -57,12 +62,27 @@ supersedes: mem:<uuid>|none
 
 Run these scripts from `scripts/` with `--workspace <path>`:
 
-0. `select_memory_profile.py`
+0. `activate.py`
+- Preferred post-install entrypoint.
+- Runs one-time backend bootstrap and installs scheduler jobs.
+- Default scheduler mode:
+  - macOS: `launchd`
+  - non-macOS: `cron`
+- If qmd is installed later, rerun with `--force-bootstrap` to re-detect backend and switch profile.
+
+0a. `select_memory_profile.py`
 - Auto-detect qmd availability and choose profile automatically:
   - qmd detected: selects `openclaw.memory-profile.qmd.json`
   - qmd not detected: selects `openclaw.memory-profile.json`
 - Optional merge into OpenClaw config:
   - `--target-config ~/.openclaw/openclaw.json --apply`
+- Profiles are loaded from `references/profiles/` inside this skill package by default.
+
+0b. `bootstrap_profile_once.py`
+- Runs the backend selection once and writes a state marker:
+  - first run: detect qmd and apply selected profile
+  - later runs: `skipped` until `--force` is used
+- Default state marker: `memory/state/profile-bootstrap.json`
 
 1. `importance_score.py`
 - Re-score episodic/semantic memories using 5 signals:

@@ -64,10 +64,29 @@ def backup_file(path: Path) -> Path:
     return backup
 
 
+def resolve_profile_paths(profiles_dir: Path) -> Tuple[Path, Path]:
+    builtin_profile = profiles_dir / "openclaw.memory-profile.json"
+    qmd_profile = profiles_dir / "openclaw.memory-profile.qmd.json"
+    if not builtin_profile.exists():
+        raise SystemExit(f"missing profile: {builtin_profile}")
+    if not qmd_profile.exists():
+        raise SystemExit(f"missing profile: {qmd_profile}")
+    return builtin_profile, qmd_profile
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace", default=".", help="OpenClaw workspace root.")
-    parser.add_argument("--repo-root", default="", help="Repo root containing profile JSON files.")
+    parser.add_argument(
+        "--profiles-dir",
+        default="",
+        help="Directory containing openclaw.memory-profile*.json files. Defaults to skill references/profiles.",
+    )
+    parser.add_argument(
+        "--repo-root",
+        default="",
+        help="Deprecated fallback for older layouts. If set, profiles are loaded from this path.",
+    )
     parser.add_argument(
         "--output",
         default="openclaw.memory-profile.selected.json",
@@ -92,14 +111,14 @@ def main() -> int:
     args = parser.parse_args()
 
     workspace = Path(args.workspace).expanduser().resolve()
-    repo_root = Path(args.repo_root).expanduser().resolve() if args.repo_root else Path(__file__).resolve().parents[2]
-
-    builtin_profile = repo_root / "openclaw.memory-profile.json"
-    qmd_profile = repo_root / "openclaw.memory-profile.qmd.json"
-    if not builtin_profile.exists():
-        raise SystemExit(f"missing profile: {builtin_profile}")
-    if not qmd_profile.exists():
-        raise SystemExit(f"missing profile: {qmd_profile}")
+    skill_root = Path(__file__).resolve().parents[1]
+    if args.profiles_dir:
+        profiles_dir = Path(args.profiles_dir).expanduser().resolve()
+    elif args.repo_root:
+        profiles_dir = Path(args.repo_root).expanduser().resolve()
+    else:
+        profiles_dir = (skill_root / "references" / "profiles").resolve()
+    builtin_profile, qmd_profile = resolve_profile_paths(profiles_dir)
 
     qmd_detected = False
     qmd_reason = "not_checked"
@@ -142,6 +161,7 @@ def main() -> int:
         "qmd_detected": qmd_detected,
         "qmd_detection_reason": qmd_reason,
         "workspace": str(workspace),
+        "profiles_dir": str(profiles_dir),
         "output_path": str(output_path),
         "target_config": merged_target,
         "backup_created": backup_created,

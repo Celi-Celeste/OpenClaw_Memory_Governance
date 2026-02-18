@@ -13,6 +13,12 @@ def cron_lines(workspace: Path, scripts_dir: Path, agent_id: str) -> list[str]:
     logs = workspace / "memory" / "logs"
     q = shlex.quote
     lines = [
+        (
+            "55 2 * * * /usr/bin/env python3 "
+            f"{q(str(scripts_dir / 'bootstrap_profile_once.py'))} "
+            f"--workspace {q(str(workspace))} "
+            f">> {q(str(logs / 'bootstrap.log'))} 2>&1"
+        ),
         f"5 * * * * /usr/bin/env python3 {q(str(scripts_dir / 'importance_score.py'))} --workspace {q(str(workspace))} --window-days 30 --max-updates 400 >> {q(str(logs / 'importance.log'))} 2>&1",
         f"0 * * * * /usr/bin/env python3 {q(str(scripts_dir / 'hourly_semantic_extract.py'))} --workspace {q(str(workspace))} >> {q(str(logs / 'hourly.log'))} 2>&1",
         (
@@ -60,6 +66,7 @@ def write_launchd_plist(
     minute: int,
     weekday: int | None = None,
     extra_args: list[str] | None = None,
+    run_at_load: bool = False,
 ) -> None:
     args = ["/usr/bin/env", "python3", str(script_path), "--workspace", str(workspace)]
     if extra_args:
@@ -67,7 +74,7 @@ def write_launchd_plist(
     payload = {
         "Label": label,
         "ProgramArguments": args,
-        "RunAtLoad": False,
+        "RunAtLoad": run_at_load,
         "StandardOutPath": str(logs_dir / f"{label}.out.log"),
         "StandardErrorPath": str(logs_dir / f"{label}.err.log"),
         "StartCalendarInterval": {"Hour": hour, "Minute": minute},
@@ -91,12 +98,23 @@ def main() -> int:
     logs_dir = workspace / "memory" / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
+    print("# IMPORTANT: cadence jobs do not run until you install these entries in cron/launchd")
     print("# crontab entries")
     for line in cron_lines(workspace, scripts_dir, agent_id=args.agent_id):
         print(line)
 
     if args.launchd_dir:
         out = Path(args.launchd_dir).expanduser().resolve()
+        write_launchd_plist(
+            out / "com.openclaw.memory.bootstrap.plist",
+            "com.openclaw.memory.bootstrap",
+            scripts_dir / "bootstrap_profile_once.py",
+            workspace,
+            logs_dir,
+            hour=2,
+            minute=55,
+            run_at_load=True,
+        )
         write_launchd_plist(
             out / "com.openclaw.memory.importance.plist",
             "com.openclaw.memory.importance",

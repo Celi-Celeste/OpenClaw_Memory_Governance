@@ -25,6 +25,9 @@ Works and remains useful. You still get:
 8. session JSONL hygiene (`session_hygiene.py`)
 9. deterministic ordered recall wrapper (`ordered_recall.py`)
 10. backend auto-selection helper (`select_memory_profile.py`)
+11. one-time backend bootstrap runner (`bootstrap_profile_once.py`)
+12. one-command activation entrypoint (`activate.py`)
+13. forced backend re-bootstrap support (`activate.py --force-bootstrap`) when qmd is added later
 
 Missing in skill-only mode:
 

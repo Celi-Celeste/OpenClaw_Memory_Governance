@@ -1,5 +1,12 @@
 # Installation
 
+## Critical: Activation Is Required
+
+ClawHub install alone is not enough.
+
+Cadence scripts do not run until scheduler jobs are installed (cron or launchd).  
+If scheduler setup is skipped, memory governance behavior will not execute.
+
 ## Prerequisites
 
 1. OpenClaw installed and running
@@ -16,27 +23,41 @@ If your ClawHub instance requires raw files, upload the skill directory contents
 
 ## 2) Apply Config Profile (Recommended)
 
-Auto-select profile (recommended):
+Recommended one-command activation:
 
 ```bash
 cd <repo-root>/skills/openclaw-memory-governance/scripts
-python3 select_memory_profile.py \
-  --workspace "$HOME/.openclaw/workspace" \
-  --repo-root "<repo-root>" \
-  --target-config "$HOME/.openclaw/openclaw.json" \
-  --apply
+python3 activate.py
 ```
 
-Manual choice (if preferred):
+If qmd is installed after this first run, rerun activation to re-detect backend and switch profile:
+
+```bash
+python3 activate.py --force-bootstrap
+```
+
+`activate.py` will:
+
+1. detect qmd availability and select builtin vs qmd profile
+2. apply selected profile into `~/.openclaw/openclaw.json`
+3. install scheduler jobs (`launchd` on macOS, `cron` elsewhere)
+4. run backend bootstrap in one-time marker mode
+5. support forced backend re-bootstrap via `--force-bootstrap` when qmd availability changes later
+
+Advanced manual profile control (optional):
 
 1. Builtin search:
    - `openclaw.memory-profile.json`
 2. QMD backend:
    - `openclaw.memory-profile.qmd.json`
 
-Merge the selected profile into your OpenClaw config (`~/.openclaw/openclaw.json`).
+Merge the selected profile into your OpenClaw config (`~/.openclaw/openclaw.json`) if not using `activate.py`.
 
 ## 3) Configure Cadence Jobs
+
+If you used `activate.py`, scheduler setup is already handled.
+
+Manual scheduler setup (optional/advanced):
 
 Generate schedule commands:
 
@@ -51,10 +72,11 @@ Notes:
 
 1. Transcript mirror defaults to `archive/transcripts/` (outside `memory/`).
 2. Transcript mirror defaults to `--transcript-mode sanitized` (secret redaction + `0600` file permissions).
-3. Importance scoring defaults are included in generated schedules (`importance_score.py`).
-4. Session hygiene defaults are included in generated schedules (`session_hygiene.py`).
-5. Weekly cadence now includes identity promotion before drift review.
-6. Risky transcript overrides require `--acknowledge-transcript-risk`:
+3. Backend bootstrap check is included in generated schedules (`bootstrap_profile_once.py`).
+4. Importance scoring defaults are included in generated schedules (`importance_score.py`).
+5. Session hygiene defaults are included in generated schedules (`session_hygiene.py`).
+6. Weekly cadence now includes identity promotion before drift review.
+7. Risky transcript overrides require `--acknowledge-transcript-risk`:
    - `--transcript-mode full`
    - `--allow-external-transcript-root`
    - `--allow-transcripts-under-memory`

@@ -4,14 +4,30 @@
 
 This skill package supports routine cadence jobs without modifying OpenClaw core code.
 
+## Critical Activation Requirement
+
+ClawHub install alone does not execute cadence scripts.  
+You must install generated scheduler entries (cron/launchd), or this memory governance stack will remain idle.
+
+Recommended first action after install:
+
+`python3 scripts/activate.py`
+
+This single command runs backend bootstrap and installs scheduler entries.
+
+If qmd is installed after initial activation, rerun:
+
+`python3 scripts/activate.py --force-bootstrap`
+
 Cadence jobs:
 
 1. Hourly: importance scoring + concept normalization
 2. Hourly: semantic extraction
-3. Daily: consolidation + transcript mirror rotation
-4. Daily: session hygiene for OpenClaw JSONL logs
-5. Weekly: identity promotion
-6. Weekly: drift review + soft forgetting
+3. Daily: one-time backend bootstrap check (`bootstrap_profile_once.py`)
+4. Daily: consolidation + transcript mirror rotation
+5. Daily: session hygiene for OpenClaw JSONL logs
+6. Weekly: identity promotion
+7. Weekly: drift review + soft forgetting
 
 ## Heartbeat Policy
 
@@ -41,6 +57,7 @@ python3 scripts/render_schedule.py --workspace /path/to/workspace --agent-id mai
 Example output (install with `crontab -e`):
 
 ```cron
+55 2 * * * /usr/bin/env python3 /path/to/skill/scripts/bootstrap_profile_once.py --workspace /path/to/workspace >> /path/to/workspace/memory/logs/bootstrap.log 2>&1
 5 * * * * /usr/bin/env python3 /path/to/skill/scripts/importance_score.py --workspace /path/to/workspace --window-days 30 --max-updates 400 >> /path/to/workspace/memory/logs/importance.log 2>&1
 0 * * * * /usr/bin/env python3 /path/to/skill/scripts/hourly_semantic_extract.py --workspace /path/to/workspace >> /path/to/workspace/memory/logs/hourly.log 2>&1
 10 3 * * * /usr/bin/env python3 /path/to/skill/scripts/daily_consolidate.py --workspace /path/to/workspace --agent-id main --transcript-root archive/transcripts --transcript-mode sanitized >> /path/to/workspace/memory/logs/daily.log 2>&1
@@ -70,6 +87,7 @@ Then load:
 
 ```bash
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.hourly.plist
+launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.bootstrap.plist
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.daily.plist
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.weekly-identity.plist
 launchctl bootstrap gui/$(id -u) /path/to/output/plists/com.openclaw.memory.weekly.plist
@@ -79,6 +97,7 @@ To unload:
 
 ```bash
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.hourly.plist
+launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.bootstrap.plist
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.daily.plist
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.weekly-identity.plist
 launchctl bootout gui/$(id -u) /path/to/output/plists/com.openclaw.memory.weekly.plist

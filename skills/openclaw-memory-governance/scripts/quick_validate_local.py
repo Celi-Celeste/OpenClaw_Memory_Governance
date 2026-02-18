@@ -61,6 +61,8 @@ def main() -> int:
         "weekly_drift_review.py",
         "transcript_lookup.py",
         "select_memory_profile.py",
+        "bootstrap_profile_once.py",
+        "activate.py",
         "session_hygiene.py",
         "render_schedule.py",
         "smoke_suite.py",
@@ -68,6 +70,15 @@ def main() -> int:
     for script in required_scripts:
         if not (skill_dir / "scripts" / script).exists():
             return fail(f"required script missing: {script}")
+
+    required_profiles = [
+        "openclaw.memory-profile.json",
+        "openclaw.memory-profile.qmd.json",
+    ]
+    profiles_dir = skill_dir / "references" / "profiles"
+    for profile in required_profiles:
+        if not (profiles_dir / profile).exists():
+            return fail(f"required profile template missing: references/profiles/{profile}")
 
     print("quick_validate_local ok")
     return 0

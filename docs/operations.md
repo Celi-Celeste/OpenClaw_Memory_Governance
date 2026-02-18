@@ -1,5 +1,18 @@
 # Operations
 
+## Critical: Activation Is Required
+
+Installing from ClawHub does not execute these jobs automatically.  
+If cron/launchd entries are not installed, the memory governance system remains idle.
+
+Recommended activation command:
+
+`activate.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json"`
+
+If qmd is installed later, rerun:
+
+`activate.py --workspace "~/.openclaw/workspace" --target-config "~/.openclaw/openclaw.json" --force-bootstrap`
+
 ## Cadence Jobs
 
 1. Hourly: `hourly_semantic_extract.py`
@@ -8,12 +21,13 @@
 4. Weekly: `weekly_identity_promote.py`
 5. Weekly: `weekly_drift_review.py`
 6. Daily: `session_hygiene.py`
+7. Daily (one-time effect): `bootstrap_profile_once.py`
 
 ## Backend Profile Selection
 
 Use:
 
-`select_memory_profile.py --workspace "<workspace>" --repo-root "<repo-root>" --target-config "~/.openclaw/openclaw.json" --apply`
+`select_memory_profile.py --workspace "<workspace>" --target-config "~/.openclaw/openclaw.json" --apply`
 
 Behavior:
 
@@ -21,6 +35,13 @@ Behavior:
 2. Selects qmd profile if detected, otherwise builtin profile
 3. Writes `openclaw.memory-profile.selected.json` in workspace
 4. Optionally merges selected profile into target OpenClaw config
+
+Bootstrap mode (recommended for routine rollout):
+
+`bootstrap_profile_once.py --workspace "<workspace>" --target-config "~/.openclaw/openclaw.json"`
+
+1. First run applies backend selection and writes `memory/state/profile-bootstrap.json`
+2. Later runs exit quickly with `status=skipped` unless `--force` is provided
 
 Default transcript mirror root:
 

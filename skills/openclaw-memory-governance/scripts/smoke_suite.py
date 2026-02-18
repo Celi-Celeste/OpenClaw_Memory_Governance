@@ -65,6 +65,9 @@ def write_entries(path: Path, entries: list[dict]) -> None:
 def main() -> int:
     script_dir = Path(__file__).resolve().parent
     repo_root = script_dir.parents[2]
+    skill_profiles = script_dir.parent / "references" / "profiles"
+    assert (skill_profiles / "openclaw.memory-profile.json").exists(), "skill profile template missing: builtin"
+    assert (skill_profiles / "openclaw.memory-profile.qmd.json").exists(), "skill profile template missing: qmd"
     qmd_profile = repo_root / "openclaw.memory-profile.qmd.json"
     profile_obj = json.loads(qmd_profile.read_text(encoding="utf-8"))
     qmd_cfg = profile_obj.get("memory", {}).get("qmd", {})
@@ -98,8 +101,6 @@ def main() -> int:
                 str(script_dir / "select_memory_profile.py"),
                 "--workspace",
                 str(workspace),
-                "--repo-root",
-                str(repo_root),
                 "--qmd-command",
                 "definitely-missing-qmd-binary",
                 "--apply",
@@ -108,6 +109,7 @@ def main() -> int:
         )
         selector_builtin_payload = json.loads(selector_builtin.stdout)
         assert selector_builtin_payload["selected_backend"] == "builtin", "profile selector should choose builtin when qmd is unavailable"
+        assert selector_builtin_payload["profiles_dir"].endswith("references/profiles"), "selector should default to skill-local profile templates"
         selected_snapshot = workspace / "openclaw.memory-profile.selected.json"
         assert selected_snapshot.exists(), "profile selector failed to write selected profile snapshot"
         selected_snapshot_payload = json.loads(selected_snapshot.read_text(encoding="utf-8"))
@@ -119,8 +121,6 @@ def main() -> int:
                 str(script_dir / "select_memory_profile.py"),
                 "--workspace",
                 str(workspace),
-                "--repo-root",
-                str(repo_root),
                 "--force-backend",
                 "qmd",
                 "--dry-run",
@@ -129,6 +129,67 @@ def main() -> int:
         )
         selector_forced_payload = json.loads(selector_forced_qmd.stdout)
         assert selector_forced_payload["selected_backend"] == "qmd", "profile selector should honor forced qmd backend"
+
+        target_config = workspace / "config" / "openclaw.json"
+        bootstrap_first = run(
+            [
+                "python3",
+                str(script_dir / "bootstrap_profile_once.py"),
+                "--workspace",
+                str(workspace),
+                "--target-config",
+                str(target_config),
+                "--qmd-command",
+                "definitely-missing-qmd-binary",
+            ],
+            cwd=script_dir,
+        )
+        bootstrap_first_payload = json.loads(bootstrap_first.stdout)
+        assert bootstrap_first_payload["status"] == "applied", "bootstrap should apply on first run"
+        target_payload = json.loads(target_config.read_text(encoding="utf-8"))
+        assert target_payload.get("memory", {}).get("backend") != "qmd", "bootstrap should write builtin profile when qmd is missing"
+        state_path = workspace / "memory" / "state" / "profile-bootstrap.json"
+        assert state_path.exists(), "bootstrap should write one-time state marker"
+
+        bootstrap_second = run(
+            [
+                "python3",
+                str(script_dir / "bootstrap_profile_once.py"),
+                "--workspace",
+                str(workspace),
+                "--target-config",
+                str(target_config),
+                "--qmd-command",
+                "definitely-missing-qmd-binary",
+            ],
+            cwd=script_dir,
+        )
+        bootstrap_second_payload = json.loads(bootstrap_second.stdout)
+        assert bootstrap_second_payload["status"] == "skipped", "bootstrap should skip after marker exists"
+        assert bootstrap_second_payload["reason"] == "already_bootstrapped", "bootstrap skip reason mismatch"
+
+        activate_run = run(
+            [
+                "python3",
+                str(script_dir / "activate.py"),
+                "--workspace",
+                str(workspace),
+                "--target-config",
+                str(target_config),
+                "--scheduler",
+                "none",
+                "--force-bootstrap",
+                "--qmd-command",
+                "definitely-missing-qmd-binary",
+            ],
+            cwd=script_dir,
+        )
+        activate_payload = json.loads(activate_run.stdout)
+        assert activate_payload["status"] == "ok", "activate should return ok status"
+        assert activate_payload["scheduler"]["scheduler"] == "none", "activate scheduler override mismatch"
+        assert activate_payload["scheduler"]["status"] == "skipped", "activate should skip scheduler when explicitly disabled"
+        assert activate_payload["force_bootstrap"] is True, "activate should report forced bootstrap mode"
+        assert activate_payload["bootstrap"]["status"] == "applied", "activate should re-apply bootstrap when forced"
 
         today = dt.date.today()
         epi = workspace / "memory" / "episodic" / f"{today.isoformat()}.md"
