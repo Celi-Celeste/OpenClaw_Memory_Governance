@@ -24,6 +24,11 @@ Recommended heartbeat behavior:
 
 This keeps runtime stable and avoids context flooding.
 
+Cadence safety:
+
+1. Jobs use non-blocking lock files to avoid overlap.
+2. If a lock is held, the script exits with `skipped=lock_held`.
+
 ## Crontab Example
 
 Generate machine-specific lines:

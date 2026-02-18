@@ -11,7 +11,9 @@ from typing import Dict, List, Tuple
 
 from memory_lib import (
     MemoryEntry,
+    atomic_write_text,
     ensure_workspace_layout,
+    file_lock,
     jaccard_similarity,
     parse_iso_date,
     parse_memory_file,
@@ -62,7 +64,7 @@ def append_drift_log(workspace: Path, lines: List[str], dry_run: bool) -> None:
         existing = path.read_text(encoding="utf-8").rstrip() + "\n\n"
     payload = existing + "\n".join(lines).rstrip() + "\n"
     if not dry_run:
-        path.write_text(payload, encoding="utf-8")
+        atomic_write_text(path, payload, encoding="utf-8")
 
 
 def main() -> int:
@@ -74,68 +76,74 @@ def main() -> int:
 
     workspace = Path(args.workspace).resolve()
     ensure_workspace_layout(workspace)
-    bundles = load_semantic_entries(workspace)
+    lock_path = workspace / "memory" / "locks" / "cadence-memory.lock"
+    with file_lock(lock_path) as locked:
+        if not locked:
+            print("weekly_drift_review skipped=lock_held")
+            return 0
 
-    all_entries: List[Tuple[Path, MemoryEntry]] = []
-    for path, _, entries in bundles:
-        for e in entries:
-            all_entries.append((path, e))
+        bundles = load_semantic_entries(workspace)
 
-    now = dt.datetime.now(dt.timezone.utc)
-    cutoff = now - dt.timedelta(days=args.window_days)
-    recent: List[Tuple[Path, MemoryEntry]] = []
-    older: List[Tuple[Path, MemoryEntry]] = []
+        all_entries: List[Tuple[Path, MemoryEntry]] = []
+        for path, _, entries in bundles:
+            for e in entries:
+                all_entries.append((path, e))
 
-    for path, entry in all_entries:
-        ts = parse_iso_date(entry.meta.get("time", "")) or now
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=dt.timezone.utc)
-        if entry.meta.get("status", "active") == "historical":
-            continue
-        if ts >= cutoff:
-            recent.append((path, entry))
-        else:
-            older.append((path, entry))
+        now = dt.datetime.now(dt.timezone.utc)
+        cutoff = now - dt.timedelta(days=args.window_days)
+        recent: List[Tuple[Path, MemoryEntry]] = []
+        older: List[Tuple[Path, MemoryEntry]] = []
 
-    by_file: Dict[Path, Tuple[str, List[MemoryEntry]]] = {}
-    for path, preamble, entries in bundles:
-        by_file[path] = (preamble, entries)
-
-    actions: List[str] = []
-    changed = 0
-    relation_counts = defaultdict(int)
-    for _, new_entry in recent:
-        new_tags = set(new_entry.tags())
-        for _, old_entry in older:
-            if old_entry.meta.get("status", "active") == "historical":
+        for path, entry in all_entries:
+            ts = parse_iso_date(entry.meta.get("time", "")) or now
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=dt.timezone.utc)
+            if entry.meta.get("status", "active") == "historical":
                 continue
-            old_tags = set(old_entry.tags())
-            if new_tags and old_tags and not (new_tags & old_tags):
-                continue
-            relation = classify_relation(new_entry, old_entry)
-            relation_counts[relation] += 1
-            if relation == "SUPERSEDES":
-                old_entry.meta["status"] = "historical"
-                new_entry.meta["supersedes"] = f"mem:{old_entry.entry_id}"
-                changed += 1
-                actions.append(
-                    f"- {now.date().isoformat()} SUPERSEDES new=mem:{new_entry.entry_id} "
-                    f"old=mem:{old_entry.entry_id}"
-                )
+            if ts >= cutoff:
+                recent.append((path, entry))
+            else:
+                older.append((path, entry))
 
-    if changed and not args.dry_run:
-        for path, (preamble, entries) in by_file.items():
-            write_memory_file(path, preamble, entries)
-    append_drift_log(workspace, actions, dry_run=args.dry_run)
+        by_file: Dict[Path, Tuple[str, List[MemoryEntry]]] = {}
+        for path, preamble, entries in bundles:
+            by_file[path] = (preamble, entries)
 
-    print(
-        "weekly_drift_review "
-        f"supersedes={relation_counts['SUPERSEDES']} "
-        f"refines={relation_counts['REFINES']} "
-        f"reinforces={relation_counts['REINFORCES']} "
-        f"changed={changed}"
-    )
-    return 0
+        actions: List[str] = []
+        changed = 0
+        relation_counts = defaultdict(int)
+        for _, new_entry in recent:
+            new_tags = set(new_entry.tags())
+            for _, old_entry in older:
+                if old_entry.meta.get("status", "active") == "historical":
+                    continue
+                old_tags = set(old_entry.tags())
+                if new_tags and old_tags and not (new_tags & old_tags):
+                    continue
+                relation = classify_relation(new_entry, old_entry)
+                relation_counts[relation] += 1
+                if relation == "SUPERSEDES":
+                    old_entry.meta["status"] = "historical"
+                    new_entry.meta["supersedes"] = f"mem:{old_entry.entry_id}"
+                    changed += 1
+                    actions.append(
+                        f"- {now.date().isoformat()} SUPERSEDES new=mem:{new_entry.entry_id} "
+                        f"old=mem:{old_entry.entry_id}"
+                    )
+
+        if changed and not args.dry_run:
+            for path, (preamble, entries) in by_file.items():
+                write_memory_file(path, preamble, entries)
+        append_drift_log(workspace, actions, dry_run=args.dry_run)
+
+        print(
+            "weekly_drift_review "
+            f"supersedes={relation_counts['SUPERSEDES']} "
+            f"refines={relation_counts['REFINES']} "
+            f"reinforces={relation_counts['REINFORCES']} "
+            f"changed={changed}"
+        )
+        return 0
 
 
 if __name__ == "__main__":

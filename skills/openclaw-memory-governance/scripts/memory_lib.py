@@ -7,10 +7,17 @@ import ast
 import datetime as dt
 import os
 import re
+import tempfile
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - unavailable on Windows
+    fcntl = None
 
 ENTRY_RE = re.compile(r"^###\s+mem:([a-zA-Z0-9_-]+)\s*$")
 DEFAULT_TRANSCRIPT_ROOT = "archive/transcripts"
@@ -179,8 +186,47 @@ def render_memory_file(preamble: str, entries: List[MemoryEntry]) -> str:
 
 
 def write_memory_file(path: Path, preamble: str, entries: List[MemoryEntry]) -> None:
+    atomic_write_text(path, render_memory_file(preamble, entries), encoding="utf-8")
+
+
+def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_memory_file(preamble, entries), encoding="utf-8")
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as fh:
+            fh.write(text)
+        os.replace(tmp_name, path)
+    finally:
+        try:
+            if os.path.exists(tmp_name):
+                os.unlink(tmp_name)
+        except OSError:
+            pass
+
+
+@contextmanager
+def file_lock(lock_path: Path):
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+", encoding="utf-8")
+    locked = False
+    try:
+        if fcntl is None:
+            locked = True
+        else:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                locked = True
+            except BlockingIOError:
+                yield False
+                return
+        yield True
+    finally:
+        if locked and fcntl is not None:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+        handle.close()
 
 
 def normalize_text(value: str) -> str:

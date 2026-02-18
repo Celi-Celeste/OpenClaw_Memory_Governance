@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from memory_lib import redact_secrets
+from memory_lib import atomic_write_text, file_lock, redact_secrets
 
 
 def resolve_sessions_dir(args: argparse.Namespace) -> Path:
@@ -82,7 +82,7 @@ def redact_jsonl_file(path: Path, dry_run: bool) -> Tuple[int, int]:
             out_lines.append(raw)
 
     if changed_lines > 0 and not dry_run:
-        path.write_text("\n".join(out_lines).rstrip() + "\n", encoding="utf-8")
+        atomic_write_text(path, "\n".join(out_lines).rstrip() + "\n", encoding="utf-8")
 
     return changed_events, changed_lines
 
@@ -114,7 +114,7 @@ def prune_sessions_store(store_path: Path, existing_jsonl: set[str], dry_run: bo
         removed += 1
 
     if removed > 0 and not dry_run:
-        store_path.write_text(json.dumps(cleaned, indent=2) + "\n", encoding="utf-8")
+        atomic_write_text(store_path, json.dumps(cleaned, indent=2) + "\n", encoding="utf-8")
     return removed
 
 
@@ -132,68 +132,74 @@ def main() -> int:
     if not sessions_dir.exists():
         raise SystemExit(f"sessions directory does not exist: {sessions_dir}")
 
-    now = dt.datetime.now(dt.timezone.utc)
-    prune_cutoff = now - dt.timedelta(days=max(args.retention_days, 0))
-    recent_cutoff = now - dt.timedelta(minutes=max(args.skip_recent_minutes, 0))
+    lock_path = sessions_dir / ".session-hygiene.lock"
+    with file_lock(lock_path) as locked:
+        if not locked:
+            print("session_hygiene skipped=lock_held")
+            return 0
 
-    perms_dirs = 0
-    perms_files = 0
-    redacted_events = 0
-    redacted_files = 0
-    skipped_recent = 0
-    pruned_files = 0
+        now = dt.datetime.now(dt.timezone.utc)
+        prune_cutoff = now - dt.timedelta(days=max(args.retention_days, 0))
+        recent_cutoff = now - dt.timedelta(minutes=max(args.skip_recent_minutes, 0))
 
-    if apply_permissions(sessions_dir, 0o700, args.dry_run):
-        perms_dirs += 1
+        perms_dirs = 0
+        perms_files = 0
+        redacted_events = 0
+        redacted_files = 0
+        skipped_recent = 0
+        pruned_files = 0
 
-    jsonl_files = sorted(sessions_dir.glob("*.jsonl"))
-    for path in jsonl_files:
-        stat = path.stat()
-        mtime = dt.datetime.fromtimestamp(stat.st_mtime, tz=dt.timezone.utc)
+        if apply_permissions(sessions_dir, 0o700, args.dry_run):
+            perms_dirs += 1
 
-        if args.retention_days > 0 and mtime < prune_cutoff:
-            pruned_files += 1
-            if not args.dry_run:
-                path.unlink(missing_ok=True)
-            continue
+        jsonl_files = sorted(sessions_dir.glob("*.jsonl"))
+        for path in jsonl_files:
+            stat = path.stat()
+            mtime = dt.datetime.fromtimestamp(stat.st_mtime, tz=dt.timezone.utc)
 
-        if apply_permissions(path, 0o600, args.dry_run):
-            perms_files += 1
+            if args.retention_days > 0 and mtime < prune_cutoff:
+                pruned_files += 1
+                if not args.dry_run:
+                    path.unlink(missing_ok=True)
+                continue
 
-        if args.disable_redaction:
-            continue
-        if mtime >= recent_cutoff:
-            skipped_recent += 1
-            continue
+            if apply_permissions(path, 0o600, args.dry_run):
+                perms_files += 1
 
-        changed_events, changed_lines = redact_jsonl_file(path, dry_run=args.dry_run)
-        redacted_events += changed_events
-        if changed_lines > 0:
-            redacted_files += 1
+            if args.disable_redaction:
+                continue
+            if mtime >= recent_cutoff:
+                skipped_recent += 1
+                continue
 
-    sessions_json = sessions_dir / "sessions.json"
-    if sessions_json.exists():
-        if apply_permissions(sessions_json, 0o600, args.dry_run):
-            perms_files += 1
-        existing_jsonl = {p.name for p in sessions_dir.glob("*.jsonl")}
-        pruned_store_entries = prune_sessions_store(sessions_json, existing_jsonl=existing_jsonl, dry_run=args.dry_run)
-    else:
-        pruned_store_entries = 0
+            changed_events, changed_lines = redact_jsonl_file(path, dry_run=args.dry_run)
+            redacted_events += changed_events
+            if changed_lines > 0:
+                redacted_files += 1
 
-    print(
-        "session_hygiene "
-        f"sessions_dir={sessions_dir} "
-        f"retention_days={args.retention_days} "
-        f"redaction_enabled={str(not args.disable_redaction).lower()} "
-        f"permissions_dirs={perms_dirs} "
-        f"permissions_files={perms_files} "
-        f"redacted_files={redacted_files} "
-        f"redacted_events={redacted_events} "
-        f"skipped_recent={skipped_recent} "
-        f"pruned_files={pruned_files} "
-        f"pruned_store_entries={pruned_store_entries}"
-    )
-    return 0
+        sessions_json = sessions_dir / "sessions.json"
+        if sessions_json.exists():
+            if apply_permissions(sessions_json, 0o600, args.dry_run):
+                perms_files += 1
+            existing_jsonl = {p.name for p in sessions_dir.glob("*.jsonl")}
+            pruned_store_entries = prune_sessions_store(sessions_json, existing_jsonl=existing_jsonl, dry_run=args.dry_run)
+        else:
+            pruned_store_entries = 0
+
+        print(
+            "session_hygiene "
+            f"sessions_dir={sessions_dir} "
+            f"retention_days={args.retention_days} "
+            f"redaction_enabled={str(not args.disable_redaction).lower()} "
+            f"permissions_dirs={perms_dirs} "
+            f"permissions_files={perms_files} "
+            f"redacted_files={redacted_files} "
+            f"redacted_events={redacted_events} "
+            f"skipped_recent={skipped_recent} "
+            f"pruned_files={pruned_files} "
+            f"pruned_store_entries={pruned_store_entries}"
+        )
+        return 0
 
 
 if __name__ == "__main__":

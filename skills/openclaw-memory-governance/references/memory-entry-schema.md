@@ -31,5 +31,8 @@ Concise memory statement.
 
 1. `origin_id`
 2. `recurrence`
+3. `scope` (`project|global|personal`)
+4. `durability` (`transient|project-stable|foundational`)
+5. `valid_until` (ISO timestamp or `none`)
 
 Unknown metadata keys are preserved by scripts.

@@ -16,7 +16,9 @@ from memory_lib import (
     DEFAULT_TRANSCRIPT_ROOT,
     LEGACY_TRANSCRIPT_ROOT,
     MemoryEntry,
+    atomic_write_text,
     ensure_workspace_layout,
+    file_lock,
     is_under_root,
     normalize_text,
     parse_date_from_filename,
@@ -195,7 +197,7 @@ def build_transcript_mirror(
             path = transcript_dir / f"{day.isoformat()}.md"
             written += 1
             if not dry_run:
-                path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+                atomic_write_text(path, "\n".join(out).rstrip() + "\n", encoding="utf-8")
                 try:
                     os.chmod(path, 0o600)
                 except OSError:
@@ -288,35 +290,41 @@ def main() -> int:
             "or pass --allow-transcripts-under-memory to override."
         )
 
-    migrated, legacy_conflicts = migrate_legacy_transcripts(
-        workspace,
-        transcript_dir=transcript_dir,
-        dry_run=args.dry_run,
-    )
+    lock_path = workspace / "memory" / "locks" / "cadence-memory.lock"
+    with file_lock(lock_path) as locked:
+        if not locked:
+            print("daily_consolidate skipped=lock_held")
+            return 0
 
-    deduped = consolidate_semantic(workspace, dry_run=args.dry_run)
-    pruned = prune_episodic(workspace, retention_days=args.episodic_retention_days, dry_run=args.dry_run)
-    written, removed = build_transcript_mirror(
-        workspace,
-        sessions_dir=sessions_dir,
-        transcript_dir=transcript_dir,
-        retention_days=args.transcript_retention_days,
-        transcript_mode=args.transcript_mode,
-        dry_run=args.dry_run,
-    )
+        migrated, legacy_conflicts = migrate_legacy_transcripts(
+            workspace,
+            transcript_dir=transcript_dir,
+            dry_run=args.dry_run,
+        )
 
-    print(
-        "daily_consolidate "
-        f"semantic_deduped={deduped} "
-        f"episodic_pruned={pruned} "
-        f"transcript_root={transcript_dir} "
-        f"transcript_mode={args.transcript_mode} "
-        f"transcripts_written={written} "
-        f"transcripts_removed={removed} "
-        f"legacy_migrated={migrated} "
-        f"legacy_conflicts={legacy_conflicts}"
-    )
-    return 0
+        deduped = consolidate_semantic(workspace, dry_run=args.dry_run)
+        pruned = prune_episodic(workspace, retention_days=args.episodic_retention_days, dry_run=args.dry_run)
+        written, removed = build_transcript_mirror(
+            workspace,
+            sessions_dir=sessions_dir,
+            transcript_dir=transcript_dir,
+            retention_days=args.transcript_retention_days,
+            transcript_mode=args.transcript_mode,
+            dry_run=args.dry_run,
+        )
+
+        print(
+            "daily_consolidate "
+            f"semantic_deduped={deduped} "
+            f"episodic_pruned={pruned} "
+            f"transcript_root={transcript_dir} "
+            f"transcript_mode={args.transcript_mode} "
+            f"transcripts_written={written} "
+            f"transcripts_removed={removed} "
+            f"legacy_migrated={migrated} "
+            f"legacy_conflicts={legacy_conflicts}"
+        )
+        return 0
 
 
 if __name__ == "__main__":

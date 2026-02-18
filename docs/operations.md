@@ -81,3 +81,18 @@ Behavior:
 3. Redacts likely secrets in non-recent JSONL content
 4. Prunes stale JSONL logs by retention window
 5. Removes stale entries from `sessions.json` when session files no longer exist
+
+## Cadence Safety
+
+Cadence scripts use non-blocking lock files to prevent overlap.
+
+1. If a cadence lock is already held, the new run exits with `skipped=lock_held`
+2. Memory file writes use atomic replace semantics to avoid partial file corruption
+
+## Recency Policy (Point 2 Guardrail)
+
+When weighted scoring is enabled:
+
+1. `foundational` durability entries are exempt from normal recency decay
+2. `project-stable` entries decay slower than transient entries
+3. superseded entries still drop to `historical` regardless of durability

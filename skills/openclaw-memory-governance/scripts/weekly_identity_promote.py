@@ -12,6 +12,7 @@ from typing import Dict, List, Tuple
 from memory_lib import (
     MemoryEntry,
     ensure_workspace_layout,
+    file_lock,
     new_mem_id,
     normalize_text,
     parse_iso_date,
@@ -100,69 +101,75 @@ def main() -> int:
 
     workspace = Path(args.workspace).resolve()
     ensure_workspace_layout(workspace)
-    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=args.window_days)
+    lock_path = workspace / "memory" / "locks" / "cadence-memory.lock"
+    with file_lock(lock_path) as locked:
+        if not locked:
+            print("weekly_identity_promote skipped=lock_held")
+            return 0
 
-    grouped = _load_semantic_entries(workspace, cutoff=cutoff)
-    existing_keys, existing_origin_ids = _load_existing_identity_signatures(workspace)
+        cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=args.window_days)
 
-    target_files = _identity_targets(workspace)
-    loaded_targets: Dict[str, Tuple[str, List[MemoryEntry]]] = {}
-    for name, path in target_files.items():
-        loaded_targets[name] = parse_memory_file(path)
+        grouped = _load_semantic_entries(workspace, cutoff=cutoff)
+        existing_keys, existing_origin_ids = _load_existing_identity_signatures(workspace)
 
-    promoted_counts = {"identity": 0, "preferences": 0, "decisions": 0}
-    skipped_duplicate = 0
-    skipped_threshold = 0
+        target_files = _identity_targets(workspace)
+        loaded_targets: Dict[str, Tuple[str, List[MemoryEntry]]] = {}
+        for name, path in target_files.items():
+            loaded_targets[name] = parse_memory_file(path)
 
-    for key, entries in grouped.items():
-        recurrence = len(entries)
-        best = _select_best_entry(entries)
-        if recurrence < args.min_recurrence or best.get_float("importance", 0.0) < args.min_importance:
-            skipped_threshold += 1
-            continue
+        promoted_counts = {"identity": 0, "preferences": 0, "decisions": 0}
+        skipped_duplicate = 0
+        skipped_threshold = 0
 
-        best_origin_id = best.meta.get("origin_id", "").strip() or best.entry_id
-        if key in existing_keys or best_origin_id in existing_origin_ids:
-            skipped_duplicate += 1
-            continue
+        for key, entries in grouped.items():
+            recurrence = len(entries)
+            best = _select_best_entry(entries)
+            if recurrence < args.min_recurrence or best.get_float("importance", 0.0) < args.min_importance:
+                skipped_threshold += 1
+                continue
 
-        target_name = _route_identity_file(best.tags())
-        _, target_entries = loaded_targets[target_name]
-        target_entries.append(
-            MemoryEntry(
-                entry_id=new_mem_id(),
-                meta={
-                    "time": utc_now_z(),
-                    "layer": "identity",
-                    "importance": f"{best.get_float('importance', args.min_importance):.2f}",
-                    "confidence": f"{best.get_float('confidence', 0.75):.2f}",
-                    "status": "active",
-                    "source": "job:weekly-identity-promote",
-                    "tags": str(best.tags()),
-                    "supersedes": "none",
-                    "origin_id": best_origin_id,
-                    "recurrence": str(recurrence),
-                },
-                body=best.body,
+            best_origin_id = best.meta.get("origin_id", "").strip() or best.entry_id
+            if key in existing_keys or best_origin_id in existing_origin_ids:
+                skipped_duplicate += 1
+                continue
+
+            target_name = _route_identity_file(best.tags())
+            _, target_entries = loaded_targets[target_name]
+            target_entries.append(
+                MemoryEntry(
+                    entry_id=new_mem_id(),
+                    meta={
+                        "time": utc_now_z(),
+                        "layer": "identity",
+                        "importance": f"{best.get_float('importance', args.min_importance):.2f}",
+                        "confidence": f"{best.get_float('confidence', 0.75):.2f}",
+                        "status": "active",
+                        "source": "job:weekly-identity-promote",
+                        "tags": str(best.tags()),
+                        "supersedes": "none",
+                        "origin_id": best_origin_id,
+                        "recurrence": str(recurrence),
+                    },
+                    body=best.body,
+                )
             )
+            promoted_counts[target_name] += 1
+            existing_keys.add(key)
+            existing_origin_ids.add(best_origin_id)
+
+        if not args.dry_run:
+            for target_name, (preamble, entries) in loaded_targets.items():
+                write_memory_file(target_files[target_name], preamble, entries)
+
+        print(
+            "weekly_identity_promote "
+            f"promoted_identity={promoted_counts['identity']} "
+            f"promoted_preferences={promoted_counts['preferences']} "
+            f"promoted_decisions={promoted_counts['decisions']} "
+            f"skipped_threshold={skipped_threshold} "
+            f"skipped_duplicate={skipped_duplicate}"
         )
-        promoted_counts[target_name] += 1
-        existing_keys.add(key)
-        existing_origin_ids.add(best_origin_id)
-
-    if not args.dry_run:
-        for target_name, (preamble, entries) in loaded_targets.items():
-            write_memory_file(target_files[target_name], preamble, entries)
-
-    print(
-        "weekly_identity_promote "
-        f"promoted_identity={promoted_counts['identity']} "
-        f"promoted_preferences={promoted_counts['preferences']} "
-        f"promoted_decisions={promoted_counts['decisions']} "
-        f"skipped_threshold={skipped_threshold} "
-        f"skipped_duplicate={skipped_duplicate}"
-    )
-    return 0
+        return 0
 
 
 if __name__ == "__main__":

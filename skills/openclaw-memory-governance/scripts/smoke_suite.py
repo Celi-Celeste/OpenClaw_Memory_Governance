@@ -214,8 +214,15 @@ def main() -> int:
         )
 
         transcript_root = workspace / "archive" / "transcripts"
-        transcript = transcript_root / f"{today.isoformat()}.md"
-        assert transcript.exists(), "daily transcript mirror not created in archive/transcripts"
+        transcripts = sorted(transcript_root.glob("*.md"))
+        assert transcripts, "daily transcript mirror not created in archive/transcripts"
+        transcript = None
+        for candidate in transcripts:
+            txt = candidate.read_text(encoding="utf-8")
+            if "Please revisit memory cadence and transcript lookup details" in txt:
+                transcript = candidate
+                break
+        assert transcript is not None, "daily transcript mirror missing expected session content"
         assert (transcript_root / f"{legacy_day.isoformat()}.md").exists(), "legacy transcript was not migrated"
         assert not legacy_transcript.exists(), "legacy transcript file was not moved"
         transcript_text = transcript.read_text(encoding="utf-8")

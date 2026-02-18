@@ -110,6 +110,12 @@ Run these scripts from `scripts/` with `--workspace <path>`:
 - Redact likely secrets in stale JSONL transcript lines.
 - Prune old JSONL files by retention window and clean stale `sessions.json` entries.
 
+Cadence safety:
+
+1. Cadence jobs use non-blocking lock files to avoid overlap.
+2. If a lock is held, scripts exit with `skipped=lock_held`.
+3. Memory writes use atomic replace operations.
+
 ## Confidence Gate Behavior
 
 When recall is weak, suggest transcript lookup instead of guessing.
@@ -141,6 +147,14 @@ Do not:
 2. alter gateway session store formats
 3. fork memory plugins for cadence logic
 4. auto-mix transcript mirror into normal retrieval
+
+## Recency Guardrail
+
+When applying recency decay in any scorer/ranker:
+
+1. treat `durability: foundational` memories as decay-exempt
+2. apply slower decay to `durability: project-stable`
+3. keep `status: historical` down-ranked even when durability is high
 
 ## Validation
 
