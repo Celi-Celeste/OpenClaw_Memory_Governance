@@ -1,0 +1,40 @@
+# Memory Entry Schema
+
+All cadence scripts in this skill assume this markdown format:
+
+```md
+### mem:<uuid>
+time: 2026-02-17T18:40:00Z
+layer: episodic|semantic|identity
+importance: 0.00-1.00
+confidence: 0.00-1.00
+status: active|refined|historical
+source: session:<key>|job:<name>
+tags: [project, preference]
+supersedes: mem:<uuid>|none
+---
+Concise memory statement.
+```
+
+## Required metadata keys
+
+1. `time`
+2. `layer`
+3. `importance`
+4. `confidence`
+5. `status`
+6. `source`
+7. `tags`
+8. `supersedes`
+
+## Optional metadata keys used by scripts
+
+1. `origin_id`
+2. `recurrence`
+3. `scope` (`project|global|personal`)
+4. `durability` (`transient|project-stable|foundational`)
+5. `valid_until` (ISO timestamp or `none`)
+6. `last_scored_at` (ISO timestamp)
+7. `score_goal`, `score_recurrence`, `score_future`, `score_preference`, `score_novelty`
+
+Unknown metadata keys are preserved by scripts.
